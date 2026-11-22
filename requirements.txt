@@ -1,0 +1,25 @@
+# ==============================================================================
+# Web3 ZKP Health Records & Insurance Claims - Python Requirements
+# ==============================================================================
+
+# 1. Web3 & EVM Blockchain Interaction
+web3>=7.0.0
+eth-account>=0.13.0
+eth-typing>=5.0.0
+
+# 2. Cryptography & Off-Chain Client Encryption (AES-256-GCM / ECIES)
+cryptography>=43.0.0
+pycryptodome>=3.20.0
+
+# 3. Off-Chain Prover & Integration Server (FastAPI + Uvicorn)
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.9.0
+python-multipart>=0.0.9
+
+# 4. IPFS Pinning (Pinata SDK / HTTP client) & Utilities
+requests>=2.32.0
+python-dotenv>=1.0.0
+
+# 5. HL7 FHIR Standardized Health Records Schema
+fhir.resources>=7.1.0

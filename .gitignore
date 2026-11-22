@@ -1,3 +1,36 @@
+# IDE & Editors
 .idea
 .vscode
+*.swp
+*.swo
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# Node & Frontend
+node_modules/
+.next/
+out/
+coverage/
+
+# Hardhat & Circom
+artifacts/
+cache/
+circuits/build/
+*.ptau
+*.zkey
+deployed_addresses.json
+
+
 *.pdf
