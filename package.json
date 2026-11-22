@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "description": "Privacy-Preserving Health Records & ZKP Insurance Claims Prototype",
   "scripts": {
+    "frontend:dev": "npm --prefix frontend run dev",
+    "frontend:build": "npm --prefix frontend run build",
     "circuits:compile": "circom circuits/claim_verifier.circom --r1cs --wasm --sym -o circuits/build",
     "contracts:compile": "hardhat compile",
     "contracts:deploy:local": "hardhat run scripts/deploy.js --network localhost",
