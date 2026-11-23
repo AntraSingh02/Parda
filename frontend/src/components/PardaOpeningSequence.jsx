@@ -21,7 +21,7 @@ export default function PardaOpeningSequence({ onComplete }) {
         const next = prev + 50;
         if (next >= 4200) {
           clearInterval(timer);
-          onComplete();
+          setTimeout(() => onComplete(), 0);
           return 4200;
         }
         return next;

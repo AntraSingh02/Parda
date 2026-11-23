@@ -1,6 +1,13 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("dotenv").config();
 
+const sepoliaRpc = (!process.env.SEPOLIA_RPC_URL || process.env.SEPOLIA_RPC_URL.trim() === "https://rpc.sepolia.org")
+  ? "https://ethereum-sepolia-rpc.publicnode.com"
+  : process.env.SEPOLIA_RPC_URL.trim();
+
+const rawKey = process.env.PRIVATE_KEY ? process.env.PRIVATE_KEY.trim() : "";
+const formattedKey = rawKey ? (rawKey.startsWith("0x") ? rawKey : `0x${rawKey}`) : null;
+
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: {
@@ -21,8 +28,8 @@ module.exports = {
       chainId: 31337,
     },
     sepolia: {
-      url: process.env.SEPOLIA_RPC_URL || "https://rpc.sepolia.org",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      url: sepoliaRpc,
+      accounts: formattedKey ? [formattedKey] : [],
     },
   },
   paths: {

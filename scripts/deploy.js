@@ -7,54 +7,93 @@ async function main() {
   console.log("🚀 Deploying ZKP Health Insurance Settlement System");
   console.log("=================================================");
 
-  const [deployer] = await ethers.getSigners();
+  const signers = await ethers.getSigners();
+  const deployer = signers && signers.length > 0 ? signers[0] : null;
+
+  if (!deployer) {
+    console.error("\n❌ ERROR: No deployer account found for this network.");
+    console.error("👉 Reason: PRIVATE_KEY is missing from your .env file.");
+    console.error("👉 Solution:");
+    console.error("   1. Create a .env file in the root directory (copy from .env.example).");
+    console.error("   2. Set: PRIVATE_KEY=0x<your_metamask_private_key>");
+    console.error("   3. Set: SEPOLIA_RPC_URL=https://rpc.sepolia.org\n");
+    process.exit(1);
+  }
+
   console.log("Deployer Address:", deployer.address);
-  console.log("Deployer Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETH");
+  const balance = await ethers.provider.getBalance(deployer.address);
+  console.log("Deployer Balance:", ethers.formatEther(balance), "ETH");
+
+  const network = await ethers.provider.getNetwork();
+  console.log(`Network: ${network.name} (Chain ID: ${network.chainId})`);
 
   // 1. Deploy Verifier
-  console.log("\n[1/3] Deploying Groth16 Verifier...");
+  console.log("\n[1/4] Deploying Groth16 Verifier...");
   const Verifier = await ethers.getContractFactory("Groth16Verifier");
   const verifier = await Verifier.deploy();
   await verifier.waitForDeployment();
   const verifierAddress = await verifier.getAddress();
   console.log("✅ Groth16Verifier deployed to:", verifierAddress);
 
-  // 2. Deploy Insurance Settlement Contract
-  console.log("\n[2/3] Deploying InsuranceSettlement Contract...");
-  // Initial Approved Hospitals Root (Calculated from circuits/generate_sample_input.js)
-  const initialHospitalRoot = ethers.keccak256(ethers.toUtf8Bytes("APPROVED_HOSPITALS_ROOT"));
-  const initialLiquidity = ethers.parseEther("5.0"); // Seed contract with 5 ETH liquidity for payouts
+  // 2. Deploy HospitalRegistry
+  console.log("\n[2/4] Deploying HospitalRegistry...");
+  const sampleHospitalRoot = "0x0001020304050607080900010203040506070809000102030405060708090001";
+  const HospitalRegistry = await ethers.getContractFactory("HospitalRegistry");
+  const hospitalRegistry = await HospitalRegistry.deploy([deployer.address, deployer.address, deployer.address], sampleHospitalRoot);
+  await hospitalRegistry.waitForDeployment();
+  const registryAddress = await hospitalRegistry.getAddress();
+  console.log("✅ HospitalRegistry deployed to:", registryAddress);
 
-  const Settlement = await ethers.getContractFactory("InsuranceSettlement");
-  const settlement = await Settlement.deploy(verifierAddress, initialHospitalRoot, {
-    value: initialLiquidity,
-  });
-  await settlement.waitForDeployment();
-  const settlementAddress = await settlement.getAddress();
-  console.log("✅ InsuranceSettlement deployed to:", settlementAddress);
-  console.log("💰 Seeded Liquidity Pool with 5.0 ETH");
+  // 3. Deploy ClaimManager
+  console.log("\n[3/4] Deploying ClaimManager Escrow...");
+  const payoutWeiPerRupee = 100000000000n; // 100 gwei
+  const seedAmount = balance > ethers.parseEther("0.01") ? ethers.parseEther("0.001") : 0n;
 
-  // 3. Deploy AccessRegistry
-  console.log("\n[3/3] Deploying AccessRegistry Contract...");
-  const Access = await ethers.getContractFactory("AccessRegistry");
+  const ClaimManager = await ethers.getContractFactory("ClaimManager");
+  const claimManager = await ClaimManager.deploy(
+    verifierAddress,
+    registryAddress,
+    payoutWeiPerRupee,
+    { value: seedAmount }
+  );
+  await claimManager.waitForDeployment();
+  const claimManagerAddress = await claimManager.getAddress();
+  console.log("✅ ClaimManager deployed to:", claimManagerAddress);
+  if (seedAmount > 0n) {
+    console.log(`💰 Seeded Escrow with ${ethers.formatEther(seedAmount)} ETH`);
+  }
+
+  // 4. Deploy AccessLog
+  console.log("\n[4/4] Deploying AccessLog...");
+  const Access = await ethers.getContractFactory("AccessLog");
   const accessRegistry = await Access.deploy();
   await accessRegistry.waitForDeployment();
   const accessAddress = await accessRegistry.getAddress();
-  console.log("✅ AccessRegistry deployed to:", accessAddress);
+  console.log("✅ AccessLog deployed to:", accessAddress);
 
   // Export addresses to frontend-ready config
   const deployedConfig = {
-    network: (await ethers.provider.getNetwork()).name,
-    chainId: (await ethers.provider.getNetwork()).chainId.toString(),
+    network: network.name === "unknown" ? "sepolia" : network.name,
+    chainId: network.chainId.toString(),
     verifier: verifierAddress,
-    insuranceSettlement: settlementAddress,
-    accessRegistry: accessAddress,
-    hospitalMerkleRoot: initialHospitalRoot,
+    hospitalRegistry: registryAddress,
+    claimManager: claimManagerAddress,
+    accessLog: accessAddress,
+    payoutWeiPerRupee: payoutWeiPerRupee.toString(),
+    deployedAt: new Date().toISOString(),
+    blockExplorerUrl: "https://sepolia.etherscan.io"
   };
 
   const outputPath = path.join(__dirname, "..", "deployed_addresses.json");
   fs.writeFileSync(outputPath, JSON.stringify(deployedConfig, null, 2));
+  
+  const frontendConfigPath = path.join(__dirname, "..", "frontend", "src", "contracts", "deployed_addresses.json");
+  if (fs.existsSync(path.dirname(frontendConfigPath))) {
+    fs.writeFileSync(frontendConfigPath, JSON.stringify(deployedConfig, null, 2));
+  }
+
   console.log("\n💾 Deployed addresses saved to:", outputPath);
+  console.log("💾 Frontend config updated at:", frontendConfigPath);
   console.log("=================================================");
 }
 

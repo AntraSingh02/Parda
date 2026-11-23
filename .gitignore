@@ -4,10 +4,14 @@
 *.swp
 *.swo
 
-# Environment Variables
+# Environment Variables & Secrets
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.cert
 
 # Python
 venv/
@@ -31,7 +35,8 @@ cache/
 circuits/build/
 *.ptau
 *.zkey
-deployed_addresses.json
+/deployed_addresses.json
+!frontend/src/contracts/deployed_addresses.json
 
 
 *.pdf

@@ -135,6 +135,8 @@ export default function App() {
               doctorAccessGranted={doctorAccessGranted}
               setDoctorAccessGranted={setDoctorAccessGranted}
               addAuditLog={addAuditLog}
+              claimSettled={claimSettled}
+              setActiveRole={handleRoleChange}
             />
           )}
 
