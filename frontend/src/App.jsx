@@ -227,7 +227,6 @@ export default function App() {
               breakGlassReason={breakGlassReason}
               onRevokeBreakGlass={handleRevokeBreakGlass}
               addAuditLog={addAuditLog}
-              claimSettled={claimSettled}
               setActiveRole={handleRoleChange}
             />
           )}

@@ -87,7 +87,6 @@ contract ClaimManager is Ownable, ReentrancyGuard {
     }
 
     /**
-    /**
      * @notice Deposit funds into the escrow pool (callable via MetaMask by insurer).
      */
     function depositPool() external payable {
@@ -97,7 +96,6 @@ contract ClaimManager is Ownable, ReentrancyGuard {
 
     /**
      * @notice Register an approved policy commitment with total policy limit. Insurer-only.
-     */
      */
     function registerPolicy(bytes32 commitment, uint256 limit) external onlyOwner {
         registeredPolicies[commitment] = true;
