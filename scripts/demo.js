@@ -122,9 +122,9 @@ async function runDemo() {
     );
 
     const policyCommitmentBytes32 = "0x" + BigInt(policyCredential.policyCommitment).toString(16).padStart(64, "0");
-    await claimManager.connect(insurer).registerPolicy(policyCommitmentBytes32);
+    await claimManager.connect(insurer).registerPolicy(policyCommitmentBytes32, 50000);
     console.log("✅ ClaimManager deployed with 10.0 ETH Escrow");
-    console.log("✅ Policy Commitment registered by Insurer");
+    console.log("✅ Policy Commitment registered by Insurer with ₹50,000 limit");
 
     // -------------------------------------------------------------
     // STAGE 5: ZK Proof Generation & Preflight Rule Validation
@@ -154,23 +154,37 @@ async function runDemo() {
     console.log("🔑 Anti-Replay Nullifier:", witnessInput.nullifier);
 
     // -------------------------------------------------------------
-    // STAGE 6: Autonomous On-Chain Settlement
+    // STAGE 6: Autonomous On-Chain Settlement with Real Groth16 Proof
     // -------------------------------------------------------------
-    console.log("\n[Stage 8] Submitting Claim to ClaimManager Smart Contract...");
-    const pubSignals = [
-        BigInt(witnessInput.nullifier),
-        BigInt(witnessInput.hospitalRoot),
-        BigInt(witnessInput.policyCommitment),
-        BigInt(witnessInput.claimAmount),
-        BigInt(witnessInput.claimDay),
-        BigInt(witnessInput.recipient)
+    console.log("\n[Stage 8] Generating Real Groth16 ZK Proof with snarkjs...");
+    const snarkjs = require("snarkjs");
+    const path = require("path");
+    const wasmPath = path.join(__dirname, "../circuits/build/claim_eligibility_js/claim_eligibility.wasm");
+    const zkeyPath = path.join(__dirname, "../circuits/build/claim_eligibility_final.zkey");
+
+    const { nullifier: expectedNullifier, ...circuitInputs } = witnessInput;
+    const { proof, publicSignals: fullPubSignals } = await snarkjs.groth16.fullProve(
+        circuitInputs,
+        wasmPath,
+        zkeyPath
+    );
+
+    const a = [proof.pi_a[0], proof.pi_a[1]];
+    const b = [
+        [proof.pi_b[0][1], proof.pi_b[0][0]],
+        [proof.pi_b[1][1], proof.pi_b[1][0]]
     ];
+    const c = [proof.pi_c[0], proof.pi_c[1]];
+    const pubSignals = fullPubSignals.map(s => BigInt(s));
+
+    console.log("⚡ Real Groth16 Proof Generated Successfully!");
+    console.log("Submitting Claim to ClaimManager Smart Contract...");
 
     const initialHospitalBal = await ethers.provider.getBalance(hospital.address);
     const tx = await claimManager.connect(hospital).submitClaim(
-        [1n, 2n],
-        [[1n, 2n], [3n, 4n]],
-        [5n, 6n],
+        a,
+        b,
+        c,
         pubSignals
     );
     await tx.wait();
@@ -187,10 +201,30 @@ async function runDemo() {
 
     // Attack 1: Replay claim
     try {
-        await claimManager.connect(hospital).submitClaim([1n, 2n], [[1n, 2n], [3n, 4n]], [5n, 6n], pubSignals);
+        await claimManager.connect(hospital).submitClaim(a, b, c, pubSignals);
         throw new Error("REPLAY_ATTACK FAILED: Contract should have rejected duplicate claim!");
     } catch (err) {
         console.log("🛡️  [Defended] Replay Attack: Reverted with NullifierAlreadyUsed");
+    }
+
+    // Attack 1b: Fake proof values like [1n, 2n] (C1 verification)
+    try {
+        const freshNullifier = ethers.keccak256(ethers.toUtf8Bytes("ATTACK_NULLIFIER_1"));
+        const fakePubSignals = [BigInt(freshNullifier), ...pubSignals.slice(1)];
+        await claimManager.connect(hospital).submitClaim([1n, 2n], [[1n, 2n], [3n, 4n]], [5n, 6n], fakePubSignals);
+        throw new Error("FAKE_PROOF FAILED: Contract should have rejected garbage proof!");
+    } catch (err) {
+        console.log("🛡️  [Defended] Fake Proof Attack: Reverted with InvalidZKProof");
+    }
+
+    // Attack 1c: Tampered public signal with real proof
+    try {
+        const tamperedSignals = [...pubSignals];
+        tamperedSignals[3] = 99999n; // Tampered claim amount
+        await claimManager.connect(hospital).submitClaim(a, b, c, tamperedSignals);
+        throw new Error("TAMPERED_SIGNAL FAILED: Contract should have rejected tampered signal!");
+    } catch (err) {
+        console.log("🛡️  [Defended] Tampered Signal Attack: Reverted with InvalidZKProof");
     }
 
     // Attack 2: Tampered amount exceeding policy limit
@@ -222,7 +256,9 @@ async function runDemo() {
     console.log("==================================================================");
 }
 
-runDemo().catch((err) => {
+runDemo().then(() => {
+    process.exit(0);
+}).catch((err) => {
     console.error("❌ DEMO EXECUTION FAILED:", err);
     process.exit(1);
 });

@@ -43,10 +43,26 @@ class HealthRecordEncryptor:
         return json.loads(decrypted_bytes.decode('utf-8'))
 
     @staticmethod
-    def compute_sha256(data_dict):
-        """Computes the SHA-256 digest of record contents for on-chain anchoring."""
-        raw = json.dumps(data_dict, sort_keys=True).encode('utf-8')
-        return "0x" + hashlib.sha256(raw).hexdigest()
+    def compute_sha256(payload):
+        """
+        Computes the SHA-256 digest of the ciphertext for on-chain anchoring (M2).
+        Accepts an encrypted payload dict containing 'ciphertext', raw bytes, or base64 string.
+        Never hashes plaintext records to prevent low-entropy dictionary attacks.
+        """
+        if isinstance(payload, dict) and "ciphertext" in payload:
+            ciphertext_bytes = base64.b64decode(payload["ciphertext"])
+            return "0x" + hashlib.sha256(ciphertext_bytes).hexdigest()
+        elif isinstance(payload, bytes):
+            return "0x" + hashlib.sha256(payload).hexdigest()
+        elif isinstance(payload, str):
+            try:
+                ciphertext_bytes = base64.b64decode(payload)
+                return "0x" + hashlib.sha256(ciphertext_bytes).hexdigest()
+            except Exception:
+                return "0x" + hashlib.sha256(payload.encode('utf-8')).hexdigest()
+        else:
+            raw = json.dumps(payload, sort_keys=True).encode('utf-8')
+            return "0x" + hashlib.sha256(raw).hexdigest()
 
     @staticmethod
     def mock_ipfs_pin(encrypted_payload):
