@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { HeartPulse, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { HeartPulse, AlertTriangle, ShieldCheck, ExternalLink, Loader2 } from 'lucide-react';
 import { MOCK_PATIENT, MOCK_FHIR_RECORD, MOCK_HOSPITALS } from '../data/mockData';
+import { useWeb3 } from '../context/Web3Context';
 
 export default function PatientPortal({
   isEncrypted,
@@ -16,6 +17,8 @@ export default function PatientPortal({
   onRevokeBreakGlass,
   addAuditLog,
 }) {
+  const { isLiveMode, account, executeContractTx, connectWallet } = useWeb3();
+  const [isTransacting, setIsTransacting] = useState(false);
   const [selectedHospital, setSelectedHospital] = useState(MOCK_HOSPITALS[0].id);
   const [duration, setDuration] = useState('1 hour'); // '1 hour' | '24 hours' | 'until I revoke'
   const [showSensitive, setShowSensitive] = useState(false);
@@ -42,56 +45,147 @@ export default function PatientPortal({
     }
   };
 
-  const handleGrant = () => {
+  const handleGrant = async () => {
     const hospital = MOCK_HOSPITALS.find((h) => h.id === Number(selectedHospital)) || MOCK_HOSPITALS[0];
-    
-    // Add to active grants
-    const newGrant = {
-      id: Date.now(),
-      hospitalName: hospital.name,
-      duration: duration,
-      grantedAt: 'Just now',
-    };
+    const durationSec = duration === '1 hour' ? 3600 : duration === '24 hours' ? 86400 : 0;
+    const recordCid = ipfsCid || 'bafybeic23ae33cd09cec6723c0b92cb16438072';
 
-    setActiveGrants((prev) => [newGrant, ...prev.filter((g) => g.hospitalName !== hospital.name)]);
-    setDoctorAccessGranted(true);
-    setIsEncrypted(true);
-    setStatusMessage(`Access granted to ${hospital.name} for ${duration}.`);
+    if (isLiveMode) {
+      if (!account) {
+        setStatusMessage('Connecting MetaMask...');
+        const userAcc = await connectWallet();
+        if (!userAcc) {
+          setStatusMessage('⚠️ Please connect MetaMask to broadcast on Sepolia.');
+          return;
+        }
+      }
 
-    if (addAuditLog) {
-      addAuditLog({
-        type: 'ACCESS_GRANTED',
-        title: 'Hospital Enclave Access Granted',
-        detail: `${hospital.name} granted access (${duration})`,
-        time: new Date().toLocaleTimeString(),
-      });
+      try {
+        setIsTransacting(true);
+        setStatusMessage('Prompting MetaMask signature for grantAccess...');
+
+        const result = await executeContractTx({
+          contractName: 'AccessRegistry',
+          methodName: 'grantAccess',
+          args: [hospital.address, recordCid, durationSec],
+          actionTitle: `Granting ${hospital.name} Access on Sepolia`,
+        });
+
+        const newGrant = {
+          id: Date.now(),
+          hospitalName: hospital.name,
+          duration: duration,
+          grantedAt: 'Confirmed on Sepolia',
+          txHash: result.hash,
+          explorerUrl: result.explorerUrl,
+        };
+
+        setActiveGrants((prev) => [newGrant, ...prev.filter((g) => g.hospitalName !== hospital.name)]);
+        setDoctorAccessGranted(true);
+        setIsEncrypted(true);
+        setStatusMessage(`✅ Access granted on Sepolia: ${result.hash.slice(0, 10)}...`);
+
+        if (addAuditLog) {
+          addAuditLog({
+            type: 'ACCESS_GRANTED',
+            title: 'On-Chain Hospital Enclave Access Granted (Sepolia)',
+            detail: `${hospital.name} granted access (${duration}) | Tx: ${result.hash.slice(0, 12)}...`,
+            time: new Date().toLocaleTimeString(),
+            explorerUrl: result.explorerUrl,
+          });
+        }
+      } catch (err) {
+        console.error('Grant error:', err);
+        setStatusMessage(`❌ Tx Error: ${err.reason || err.message}`);
+      } finally {
+        setIsTransacting(false);
+      }
+    } else {
+      const newGrant = {
+        id: Date.now(),
+        hospitalName: hospital.name,
+        duration: duration,
+        grantedAt: 'Just now',
+      };
+
+      setActiveGrants((prev) => [newGrant, ...prev.filter((g) => g.hospitalName !== hospital.name)]);
+      setDoctorAccessGranted(true);
+      setIsEncrypted(true);
+      setStatusMessage(`Access granted to ${hospital.name} for ${duration}.`);
+
+      if (addAuditLog) {
+        addAuditLog({
+          type: 'ACCESS_GRANTED',
+          title: 'Hospital Enclave Access Granted',
+          detail: `${hospital.name} granted access (${duration})`,
+          time: new Date().toLocaleTimeString(),
+        });
+      }
+
+      setTimeout(() => {
+        setStatusMessage('');
+      }, 4000);
     }
-
-    setTimeout(() => {
-      setStatusMessage('');
-    }, 4000);
   };
 
-  const handleRevoke = (grantId) => {
+  const handleRevoke = async (grantId) => {
     const target = activeGrants.find((g) => g.id === grantId);
-    setActiveGrants((prev) => prev.filter((g) => g.id !== grantId));
-    if (activeGrants.length <= 1) {
-      setDoctorAccessGranted(false);
-    }
-    setStatusMessage(`Access revoked${target ? ` for ${target.hospitalName}` : ''}.`);
+    const hospital = MOCK_HOSPITALS.find((h) => h.name === target?.hospitalName) || MOCK_HOSPITALS[0];
+    const recordCid = ipfsCid || 'bafybeic23ae33cd09cec6723c0b92cb16438072';
 
-    if (addAuditLog) {
-      addAuditLog({
-        type: 'ACCESS_REVOKED',
-        title: 'Hospital Enclave Access Revoked',
-        detail: `Revoked permission for ${target ? target.hospitalName : 'hospital'}`,
-        time: new Date().toLocaleTimeString(),
-      });
-    }
+    if (isLiveMode && account) {
+      try {
+        setIsTransacting(true);
+        setStatusMessage('Prompting MetaMask for revokeAccess...');
 
-    setTimeout(() => {
-      setStatusMessage('');
-    }, 3500);
+        const result = await executeContractTx({
+          contractName: 'AccessRegistry',
+          methodName: 'revokeAccess',
+          args: [hospital.address, recordCid],
+          actionTitle: `Revoking ${hospital.name} Access on Sepolia`,
+        });
+
+        setActiveGrants((prev) => prev.filter((g) => g.id !== grantId));
+        if (activeGrants.length <= 1) {
+          setDoctorAccessGranted(false);
+        }
+        setStatusMessage(`✅ Access revoked on Sepolia!`);
+
+        if (addAuditLog) {
+          addAuditLog({
+            type: 'ACCESS_REVOKED',
+            title: 'On-Chain Access Revoked (Sepolia)',
+            detail: `Revoked permission for ${target ? target.hospitalName : 'hospital'} | Tx: ${result.hash.slice(0, 12)}...`,
+            time: new Date().toLocaleTimeString(),
+            explorerUrl: result.explorerUrl,
+          });
+        }
+      } catch (err) {
+        console.error('Revoke error:', err);
+        setStatusMessage(`❌ Revocation failed: ${err.reason || err.message}`);
+      } finally {
+        setIsTransacting(false);
+      }
+    } else {
+      setActiveGrants((prev) => prev.filter((g) => g.id !== grantId));
+      if (activeGrants.length <= 1) {
+        setDoctorAccessGranted(false);
+      }
+      setStatusMessage(`Access revoked${target ? ` for ${target.hospitalName}` : ''}.`);
+
+      if (addAuditLog) {
+        addAuditLog({
+          type: 'ACCESS_REVOKED',
+          title: 'Hospital Enclave Access Revoked',
+          detail: `Revoked permission for ${target ? target.hospitalName : 'hospital'}`,
+          time: new Date().toLocaleTimeString(),
+        });
+      }
+
+      setTimeout(() => {
+        setStatusMessage('');
+      }, 3500);
+    }
   };
 
   const latestClaim = settledClaims[0];
@@ -332,9 +426,17 @@ export default function PatientPortal({
               <button
                 type="button"
                 onClick={handleGrant}
-                className="w-full py-2.5 px-4 rounded bg-[#B99561] text-[#0B1713] text-sm font-medium hover:bg-[#c9a674] transition-colors shadow-sm"
+                disabled={isTransacting}
+                className="w-full py-2.5 px-4 rounded bg-[#B99561] text-[#0B1713] text-sm font-medium hover:bg-[#c9a674] transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 cursor-pointer"
               >
-                Grant access
+                {isTransacting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-[#0B1713]" />
+                    <span>Confirming on Sepolia...</span>
+                  </>
+                ) : (
+                  <span>{isLiveMode ? 'Sign & Grant on Sepolia' : 'Grant access'}</span>
+                )}
               </button>
             </div>
 
@@ -362,13 +464,28 @@ export default function PatientPortal({
                       className="flex items-center justify-between py-2 border-b border-[#9DAF9D]/10 last:border-b-0 text-xs"
                     >
                       <div>
-                        <div className="text-[#F3EFE5] font-medium">{grant.hospitalName}</div>
-                        <div className="text-[#AEB8AA] text-[11px]">{grant.duration}</div>
+                        <div className="text-[#F3EFE5] font-medium flex items-center space-x-2">
+                          <span>{grant.hospitalName}</span>
+                          {grant.explorerUrl && (
+                            <a
+                              href={grant.explorerUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[10px] font-mono text-[#B99561] hover:underline flex items-center space-x-0.5"
+                              title="View on Sepolia Etherscan"
+                            >
+                              <span>Sepolia Tx</span>
+                              <ExternalLink className="w-2.5 h-2.5" />
+                            </a>
+                          )}
+                        </div>
+                        <div className="text-[#AEB8AA] text-[11px]">{grant.duration} • {grant.grantedAt}</div>
                       </div>
                       <button
                         type="button"
                         onClick={() => handleRevoke(grant.id)}
-                        className="text-xs text-[#AEB8AA] hover:text-[#F3EFE5] px-2.5 py-1 rounded border border-[#9DAF9D]/20 hover:border-[#B99561]/40 transition-colors"
+                        disabled={isTransacting}
+                        className="text-xs text-[#AEB8AA] hover:text-[#F3EFE5] px-2.5 py-1 rounded border border-[#9DAF9D]/20 hover:border-[#B99561]/40 transition-colors disabled:opacity-50 cursor-pointer"
                       >
                         Revoke
                       </button>

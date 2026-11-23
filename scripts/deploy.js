@@ -124,6 +124,14 @@ async function main() {
 
   console.log("\n💾 Deployed addresses saved to:", outputPath);
   console.log("💾 Frontend config updated at:", frontendConfigPath);
+
+  // Auto-sync frontend ABIs and contract address definitions
+  try {
+    require("./export_abis");
+  } catch (err) {
+    console.warn("⚠️ Could not auto-sync frontend ABIs:", err.message);
+  }
+
   console.log("=================================================");
 }
 

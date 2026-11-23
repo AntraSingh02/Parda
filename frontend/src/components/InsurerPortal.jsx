@@ -1,5 +1,7 @@
-import React from 'react';
-import { Landmark, ShieldCheck, Lock, Activity, Coins, CheckCircle, BarChart3, EyeOff } from 'lucide-react';
+import React, { useState } from 'react';
+import { Landmark, ShieldCheck, Lock, Activity, Coins, CheckCircle, BarChart3, EyeOff, ExternalLink, PlusCircle, Loader2 } from 'lucide-react';
+import { ethers } from 'ethers';
+import { useWeb3 } from '../context/Web3Context';
 
 export default function InsurerPortal({
   claimSettled,
@@ -9,8 +11,67 @@ export default function InsurerPortal({
   auditLogs = [],
   addAuditLog,
 }) {
+  const { isLiveMode, account, executeContractTx, connectWallet, deployedAddresses } = useWeb3();
+  const [fundAmount, setFundAmount] = useState('0.01');
+  const [isFunding, setIsFunding] = useState(false);
+  const [fundingStatus, setFundingStatus] = useState('');
+
   const INR_PER_ETH = 10000;
   const latestClaim = settledClaims[0];
+
+  const handleFundEscrow = async () => {
+    if (!fundAmount || isNaN(fundAmount) || parseFloat(fundAmount) <= 0) return;
+
+    if (isLiveMode) {
+      if (!account) {
+        const userAcc = await connectWallet();
+        if (!userAcc) return;
+      }
+      try {
+        setIsFunding(true);
+        setFundingStatus('Prompting MetaMask deposit...');
+
+        const result = await executeContractTx({
+          contractName: 'ClaimManager',
+          methodName: 'fund',
+          args: [],
+          overrides: { value: ethers.parseEther(fundAmount) },
+          actionTitle: `Depositing ${fundAmount} ETH to Escrow Pool`,
+        });
+
+        setFundingStatus(`✅ Successfully deposited ${fundAmount} ETH to Escrow on Sepolia!`);
+
+        if (addAuditLog) {
+          addAuditLog({
+            type: 'ESCROW_FUNDED',
+            title: 'Escrow Pool Funded on Sepolia',
+            detail: `Deposited ${fundAmount} ETH (₹${(parseFloat(fundAmount) * INR_PER_ETH).toLocaleString('en-IN')}) | Tx: ${result.hash.slice(0, 12)}...`,
+            time: new Date().toLocaleTimeString(),
+            explorerUrl: result.explorerUrl,
+          });
+        }
+      } catch (err) {
+        console.error('Funding error:', err);
+        setFundingStatus(`❌ Deposit failed: ${err.reason || err.message}`);
+      } finally {
+        setIsFunding(false);
+      }
+    } else {
+      setIsFunding(true);
+      setTimeout(() => {
+        setIsFunding(false);
+        setFundingStatus(`✅ Simulated: Deposited ${fundAmount} ETH to Escrow pool.`);
+        if (addAuditLog) {
+          addAuditLog({
+            type: 'ESCROW_FUNDED',
+            title: 'Escrow Pool Funded (Simulated)',
+            detail: `Deposited ${fundAmount} ETH (₹${(parseFloat(fundAmount) * INR_PER_ETH).toLocaleString('en-IN')}) to ClaimManager pool`,
+            time: new Date().toLocaleTimeString(),
+          });
+        }
+      }, 500);
+    }
+  };
 
   // Dynamic Chart values reflecting incoming settled claims
   const newClaimsCount = settledClaims.length > 1 ? settledClaims.length - 1 : (claimSettled ? 1 : 0);
@@ -37,21 +98,69 @@ export default function InsurerPortal({
             </p>
           </div>
           
-          <div className="flex items-center space-x-4 bg-forest-900/90 border border-sage-500/20 rounded p-3.5 font-mono text-xs shrink-0">
-            <div>
-              <div className="text-sage-muted text-[10px] uppercase">Total Pool Liquidity</div>
-              <div className="text-sm font-bold text-brass-400 font-mono">
-                {poolBalanceEth.toFixed(2)} ETH <span className="text-[11px] text-sage-muted font-normal">(₹{(poolBalanceEth * INR_PER_ETH).toLocaleString('en-IN')})</span>
+          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3 shrink-0">
+            <div className="flex items-center space-x-4 bg-forest-900/90 border border-sage-500/20 rounded p-3.5 font-mono text-xs">
+              <div>
+                <div className="text-sage-muted text-[10px] uppercase">Total Pool Liquidity</div>
+                <div className="text-sm font-bold text-brass-400 font-mono">
+                  {poolBalanceEth.toFixed(2)} ETH <span className="text-[11px] text-sage-muted font-normal">(₹{(poolBalanceEth * INR_PER_ETH).toLocaleString('en-IN')})</span>
+                </div>
+              </div>
+              <div className="h-8 w-px bg-sage-500/20" />
+              <div>
+                <div className="text-sage-muted text-[10px] uppercase">Settled Payouts</div>
+                <div className="text-sm font-bold text-ivory-200 font-mono">
+                  {totalSettledEth.toFixed(2)} ETH <span className="text-[11px] text-sage-muted font-normal">(₹{(totalSettledEth * INR_PER_ETH).toLocaleString('en-IN')})</span>
+                </div>
               </div>
             </div>
-            <div className="h-8 w-px bg-sage-500/20" />
-            <div>
-              <div className="text-sage-muted text-[10px] uppercase">Settled Payouts</div>
-              <div className="text-sm font-bold text-ivory-200 font-mono">
-                {totalSettledEth.toFixed(2)} ETH <span className="text-[11px] text-sage-muted font-normal">(₹{(totalSettledEth * INR_PER_ETH).toLocaleString('en-IN')})</span>
-              </div>
+
+            {/* Live Escrow Deposit Controls */}
+            <div className="flex items-center space-x-2 bg-forest-900/90 border border-brass-500/30 rounded p-2 text-xs font-mono">
+              <input
+                type="number"
+                step="0.005"
+                min="0.001"
+                value={fundAmount}
+                onChange={(e) => setFundAmount(e.target.value)}
+                className="w-20 px-2 py-1 rounded bg-forest-950 border border-sage-500/30 text-ivory-200 text-xs font-mono focus:outline-none focus:border-brass-400"
+                placeholder="ETH"
+                title="Deposit amount in ETH"
+              />
+              <button
+                onClick={handleFundEscrow}
+                disabled={isFunding}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded bg-gradient-to-r from-brass-600 to-brass-500 hover:from-brass-500 hover:to-brass-400 text-forest-950 font-bold text-xs transition-all shadow-sm cursor-pointer disabled:opacity-50"
+              >
+                {isFunding ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <PlusCircle className="w-3.5 h-3.5" />
+                )}
+                <span>{isLiveMode ? 'Fund Sepolia Pool' : 'Deposit Demo ETH'}</span>
+              </button>
             </div>
           </div>
+        </div>
+
+        {fundingStatus && (
+          <div className="mt-3 text-xs font-mono text-brass-400">
+            {fundingStatus}
+          </div>
+        )}
+
+        {/* Contract Link */}
+        <div className="mt-3 pt-3 border-t border-sage-500/15 flex flex-wrap items-center justify-between text-[11px] font-mono text-sage-muted">
+          <span>Contract: ClaimManager.sol ({deployedAddresses?.claimManager?.slice(0, 10)}...)</span>
+          <a
+            href={`https://sepolia.etherscan.io/address/${deployedAddresses?.claimManager}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-brass-400 hover:underline"
+          >
+            <span>Inspect ClaimManager on Sepolia Etherscan</span>
+            <ExternalLink className="w-3 h-3" />
+          </a>
         </div>
       </div>
 
@@ -91,7 +200,20 @@ export default function InsurerPortal({
                 {settledClaims.map((claim) => (
                   <tr key={claim.id} className="hover:bg-forest-850 transition-colors">
                     <td className="py-3.5 px-3.5 text-brass-400 font-bold" title={claim.nullifier}>
-                      {claim.nullifier.slice(0, 10)}...{claim.nullifier.slice(-4)}
+                      <div className="flex items-center space-x-1.5">
+                        <span>{claim.nullifier.slice(0, 10)}...{claim.nullifier.slice(-4)}</span>
+                        {claim.explorerUrl && (
+                          <a
+                            href={claim.explorerUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-brass-400 hover:underline"
+                            title="View on Sepolia Etherscan"
+                          >
+                            <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
+                        )}
+                      </div>
                     </td>
                     <td className="py-3.5 px-3.5 text-ivory-200">
                       {claim.payee}

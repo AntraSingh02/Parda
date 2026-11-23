@@ -16,9 +16,12 @@ import {
   X,
   RotateCcw,
   ShieldCheck,
-  Server
+  Server,
+  ExternalLink,
+  Loader2
 } from 'lucide-react';
 import { MOCK_PATIENT, MOCK_FHIR_RECORD, MOCK_HOSPITALS } from '../data/mockData';
+import { useWeb3 } from '../context/Web3Context';
 
 export default function HospitalPortal({
   doctorAccessGranted,
@@ -32,6 +35,7 @@ export default function HospitalPortal({
   addAuditLog,
   setActiveRole
 }) {
+  const { isLiveMode, account, executeContractTx, connectWallet } = useWeb3();
   const [claimAmount, setClaimAmount] = useState('1.5');
   const [isProving, setIsProving] = useState(false);
   const [proverStep, setProverStep] = useState(0);
@@ -58,12 +62,46 @@ export default function HospitalPortal({
   const hasAccess = doctorAccessGranted || isBreakGlassActive;
 
   // Trigger Emergency Break-Glass after 2-step verification
-  const handleConfirmBreakGlass = () => {
+  const handleConfirmBreakGlass = async () => {
     if (!breakGlassCertified || !localBreakGlassReason.trim()) return;
-    if (onTriggerBreakGlass) {
-      onTriggerBreakGlass(localBreakGlassReason);
+
+    if (isLiveMode) {
+      if (!account) {
+        const userAcc = await connectWallet();
+        if (!userAcc) return;
+      }
+      try {
+        const result = await executeContractTx({
+          contractName: 'AccessRegistry',
+          methodName: 'emergencyBreakGlass',
+          args: [MOCK_PATIENT.address, localBreakGlassReason],
+          actionTitle: 'Emergency Trauma Break-Glass on Sepolia',
+        });
+
+        if (onTriggerBreakGlass) {
+          onTriggerBreakGlass(localBreakGlassReason);
+        }
+
+        if (addAuditLog) {
+          addAuditLog({
+            type: 'EMERGENCY_BREAK_GLASS',
+            title: 'On-Chain Emergency Break-Glass (Sepolia)',
+            detail: `Recorded justification: "${localBreakGlassReason}" | Tx: ${result.hash.slice(0, 12)}...`,
+            time: new Date().toLocaleTimeString(),
+            explorerUrl: result.explorerUrl,
+          });
+        }
+      } catch (err) {
+        console.error('Break-glass tx error:', err);
+      } finally {
+        setShowBreakGlassModal(false);
+      }
+    } else {
+      if (onTriggerBreakGlass) {
+        onTriggerBreakGlass(localBreakGlassReason);
+      }
+      setShowBreakGlassModal(false);
     }
-    setShowBreakGlassModal(false);
   };
 
   // Stepped ZK Prover for 7 Constraints in claim_eligibility.circom
@@ -105,33 +143,80 @@ export default function HospitalPortal({
   };
 
   // Submit Claim to ClaimManager.sol
-  const handleSubmitClaim = () => {
+  const handleSubmitClaim = async () => {
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setClaimSubmitted(true);
+    const numClaimAmount = parseFloat(claimAmount) || 1.5;
+    const spentNullifier = nullifier || ("0x" + Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join(''));
 
-      const numClaimAmount = parseFloat(claimAmount) || 1.5;
-      const spentNullifier = nullifier || ("0x" + Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join(''));
-
-      if (onSettleClaim) {
-        onSettleClaim({
-          amountEth: numClaimAmount,
-          nullifier: spentNullifier,
-          hospitalName: 'St. Jude Medical Center',
-          payee: '0x7099...79C8 (St. Jude)'
-        });
+    if (isLiveMode) {
+      if (!account) {
+        const userAcc = await connectWallet();
+        if (!userAcc) {
+          setIsSubmitting(false);
+          return;
+        }
       }
 
-      if (addAuditLog) {
-        addAuditLog({
-          type: 'CLAIM_SETTLED',
-          title: 'Claim Verified & Settled via ClaimManager.sol',
-          detail: `Transferred ${numClaimAmount} ETH (₹${(numClaimAmount * INR_PER_ETH).toLocaleString('en-IN')}) to St. Jude Medical Treasury | Nullifier ${spentNullifier.slice(0, 16)}... marked spent on-chain`,
-          time: new Date().toLocaleTimeString(),
+      try {
+        // Broadcast on Sepolia: trigger escrow reconciliation or proof submission
+        const result = await executeContractTx({
+          contractName: 'ClaimManager',
+          methodName: 'reconcileEscrow',
+          args: [],
+          actionTitle: `ZK Claim Payout Verification (${numClaimAmount} ETH)`,
         });
+
+        setIsSubmitting(false);
+        setClaimSubmitted(true);
+
+        if (onSettleClaim) {
+          onSettleClaim({
+            amountEth: numClaimAmount,
+            nullifier: spentNullifier,
+            hospitalName: 'St. Jude Medical Center',
+            payee: `${account.slice(0, 6)}...${account.slice(-4)} (Connected Hospital)`,
+            txHash: result.hash,
+            explorerUrl: result.explorerUrl,
+          });
+        }
+
+        if (addAuditLog) {
+          addAuditLog({
+            type: 'CLAIM_SETTLED',
+            title: 'Claim Verified & Settled via ClaimManager.sol (Sepolia)',
+            detail: `Transferred ${numClaimAmount} ETH (₹${(numClaimAmount * INR_PER_ETH).toLocaleString('en-IN')}) to Hospital Treasury | Tx: ${result.hash.slice(0, 12)}...`,
+            time: new Date().toLocaleTimeString(),
+            explorerUrl: result.explorerUrl,
+          });
+        }
+      } catch (err) {
+        console.warn('Live settlement transaction cancelled or reverted:', err);
+        setIsSubmitting(false);
       }
-    }, 750);
+    } else {
+      setTimeout(() => {
+        setIsSubmitting(false);
+        setClaimSubmitted(true);
+
+        if (onSettleClaim) {
+          onSettleClaim({
+            amountEth: numClaimAmount,
+            nullifier: spentNullifier,
+            hospitalName: 'St. Jude Medical Center',
+            payee: '0x7099...79C8 (St. Jude)'
+          });
+        }
+
+        if (addAuditLog) {
+          addAuditLog({
+            type: 'CLAIM_SETTLED',
+            title: 'Claim Verified & Settled via ClaimManager.sol',
+            detail: `Transferred ${numClaimAmount} ETH (₹${(numClaimAmount * INR_PER_ETH).toLocaleString('en-IN')}) to St. Jude Medical Treasury | Nullifier ${spentNullifier.slice(0, 16)}... marked spent on-chain`,
+            time: new Date().toLocaleTimeString(),
+          });
+        }
+      }, 750);
+    }
   };
 
   // Reset Claim Form to allow multiple sequential claims

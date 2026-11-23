@@ -1,12 +1,34 @@
 import React, { useState } from 'react';
-import { Shield, User, Building2, Landmark, CheckCircle2, Copy, RotateCcw, Eye, ShieldAlert, Wallet, ExternalLink, Power } from 'lucide-react';
-import { useWallet } from '../context/WalletContext';
+import { 
+  Shield, 
+  User, 
+  Building2, 
+  Landmark, 
+  CheckCircle2, 
+  Copy, 
+  RotateCcw, 
+  Eye, 
+  ShieldAlert, 
+  Wallet, 
+  Power, 
+  Loader2, 
+  ExternalLink 
+} from 'lucide-react';
+import { useWeb3 } from '../context/Web3Context';
 
 export default function Header({ activeRole, setActiveRole, currentAccount, onReplayIntro }) {
   const [copied, setCopied] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  const { account, balance, isConnecting, isSepolia, connectWallet, disconnectWallet, switchNetwork } = useWallet();
+  const { 
+    account, 
+    balance, 
+    isSepolia, 
+    isConnecting, 
+    isLiveMode, 
+    toggleLiveMode, 
+    connectWallet, 
+    disconnectWallet, 
+    switchToSepolia 
+  } = useWeb3();
 
   const copyAddress = (addr) => {
     if (addr) {
@@ -20,17 +42,30 @@ export default function Header({ activeRole, setActiveRole, currentAccount, onRe
     <header className="sticky top-0 z-40 px-3 sm:px-6 lg:px-8 w-full bg-[#0B1713]/90 backdrop-blur-md border-b border-[#9DAF9D]/15 font-sans">
       <div className="max-w-7xl mx-auto py-2.5 flex flex-wrap items-center justify-between gap-2.5">
         
-        {/* Brand */}
-        <div className="flex items-center space-x-2">
-          <div className="w-6 h-6 rounded bg-[#12231C] border border-[#B99561]/40 flex items-center justify-center text-[#B99561]">
-            <Shield className="w-3 h-3" />
+        {/* Brand & Mode Switch */}
+        <div className="flex items-center space-x-2.5">
+          <div className="flex items-center space-x-2">
+            <div className="w-6 h-6 rounded bg-[#12231C] border border-[#B99561]/40 flex items-center justify-center text-[#B99561]">
+              <Shield className="w-3 h-3" />
+            </div>
+            <span className="text-sm sm:text-base font-medium tracking-tight text-[#F3EFE5]">
+              Parda
+            </span>
           </div>
-          <span className="text-sm sm:text-base font-medium tracking-tight text-[#F3EFE5]">
-            Parda
-          </span>
-          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#12231C] text-[#B99561] border border-[#B99561]/30 hidden sm:inline-block">
-            ZKP Web3
-          </span>
+
+          {/* Dual-Mode Toggle Pill */}
+          <button
+            onClick={toggleLiveMode}
+            title={isLiveMode ? "Switch to Fast Demo Mode (Simulated)" : "Switch to Live Sepolia Mode (MetaMask)"}
+            className={`flex items-center space-x-1.5 px-2 py-0.5 rounded text-[10px] font-mono border transition-all cursor-pointer ${
+              isLiveMode 
+                ? 'bg-amber-950/40 text-amber-300 border-amber-500/40 hover:bg-amber-900/40' 
+                : 'bg-[#12231C] text-[#AEB8AA] border-[#9DAF9D]/20 hover:text-[#F3EFE5]'
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${isLiveMode ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`} />
+            <span>{isLiveMode ? '⚡ Sepolia Live' : '🧪 Demo Mode'}</span>
+          </button>
         </div>
 
         {/* Center: The Role & Verification Control */}
@@ -108,8 +143,8 @@ export default function Header({ activeRole, setActiveRole, currentAccount, onRe
           </button>
         </div>
 
-        {/* Right: Replay Intro & MetaMask / Wallet Control */}
-        <div className="flex items-center space-x-1.5 sm:space-x-2 text-xs order-2 sm:order-3 relative">
+        {/* Right: Intro button & Web3 / Account Controls */}
+        <div className="flex items-center space-x-1.5 sm:space-x-2 text-xs order-2 sm:order-3">
           <button
             onClick={onReplayIntro}
             aria-label="Replay intro"
@@ -119,121 +154,79 @@ export default function Header({ activeRole, setActiveRole, currentAccount, onRe
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
 
-          {/* Role Diagnostic Badges */}
-          {activeRole === 'xray' ? (
-            <div className="flex items-center space-x-1 px-2.5 py-1 sm:py-1.5 rounded bg-purple-950/40 border border-purple-500/30 text-purple-300 text-[11px] sm:text-xs font-mono">
-              <Eye className="w-3 h-3 text-purple-400" />
-              <span>Inspector (Diagnostic)</span>
-            </div>
-          ) : activeRole === 'redteam' ? (
-            <div className="flex items-center space-x-1 px-2.5 py-1 sm:py-1.5 rounded bg-rose-950/40 border border-rose-500/30 text-rose-300 text-[11px] sm:text-xs font-mono">
-              <ShieldAlert className="w-3 h-3 text-rose-400" />
-              <span>Adversary (Audit)</span>
-            </div>
-          ) : account ? (
-            <div className="relative">
-              <button
-                onClick={() => setMenuOpen(!menuOpen)}
-                className="flex items-center space-x-2 px-2.5 py-1.5 rounded bg-[#12231C] border border-[#B99561]/50 text-[#F3EFE5] hover:border-[#B99561] transition-all text-xs cursor-pointer"
-              >
-                {/* Sepolia Green Badge */}
-                <span className="flex items-center space-x-1 px-1.5 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-500/30 text-[10px]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>{isSepolia ? 'Sepolia' : 'Switch Net'}</span>
-                </span>
-                
-                <span className="font-mono text-[11px] text-[#B99561] font-semibold hidden md:inline">
-                  {balance} SEP
-                </span>
-
-                <span className="font-mono text-[11px]">
-                  {account.slice(0, 6)}...{account.slice(-4)}
-                </span>
-              </button>
-
-              {/* Dropdown Menu for Disconnect & Network */}
-              {menuOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-[#12231C] border border-[#9DAF9D]/20 rounded-xl shadow-2xl p-3 z-50 space-y-2.5 font-sans">
-                  <div className="text-[11px] text-[#AEB8AA] pb-2 border-b border-[#9DAF9D]/15 flex justify-between items-center">
-                    <span>Connected via MetaMask</span>
-                    <span className="text-[10px] text-emerald-400">● Live</span>
-                  </div>
-
-                  <div className="text-xs space-y-1">
-                    <div className="text-[#AEB8AA] text-[11px]">Wallet Address</div>
-                    <div className="font-mono text-[11px] text-[#F3EFE5] break-all bg-[#0B1713] p-1.5 rounded border border-[#9DAF9D]/15 flex items-center justify-between">
-                      <span>{account.slice(0, 10)}...{account.slice(-6)}</span>
-                      <button onClick={() => copyAddress(account)} className="text-[#B99561] hover:text-[#c9a674]">
-                        {copied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="text-xs space-y-1">
-                    <div className="text-[#AEB8AA] text-[11px]">Sepolia Balance</div>
-                    <div className="font-mono text-sm text-[#B99561] font-bold">{balance} ETH</div>
-                  </div>
-
-                  {!isSepolia && (
-                    <button
-                      onClick={() => switchNetwork(11155111)}
-                      className="w-full py-1.5 rounded bg-amber-950 text-amber-300 border border-amber-500/40 text-xs text-center font-medium"
-                    >
-                      Switch to Sepolia Network
-                    </button>
-                  )}
-
-                  <a
-                    href={`https://sepolia.etherscan.io/address/${account}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-between text-xs text-[#AEB8AA] hover:text-[#F3EFE5] py-1 border-t border-[#9DAF9D]/15"
-                  >
-                    <span>View on Etherscan</span>
-                    <ExternalLink className="w-3 h-3 text-[#B99561]" />
-                  </a>
-
-                  <button
-                    onClick={() => {
-                      disconnectWallet();
-                      setMenuOpen(false);
-                    }}
-                    className="w-full flex items-center justify-center space-x-1.5 py-1.5 rounded bg-rose-950/60 hover:bg-rose-900/60 text-rose-300 border border-rose-500/30 text-xs font-medium transition-colors cursor-pointer"
-                  >
-                    <Power className="w-3 h-3" />
-                    <span>Disconnect</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex items-center space-x-2">
-              {currentAccount?.address && (
-                <button
-                  onClick={() => copyAddress(currentAccount.address)}
-                  title={`Active ${currentAccount.roleLabel || 'Account'}: Click to copy address`}
-                  className="flex items-center space-x-1.5 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded bg-[#12231C] border border-[#9DAF9D]/20 hover:border-[#B99561]/40 text-[#AEB8AA] hover:text-[#F3EFE5] transition-colors text-[11px] sm:text-xs cursor-pointer font-mono"
-                >
-                  <span className="text-[#B99561] font-semibold">{currentAccount.roleLabel}:</span>
-                  <span>{currentAccount.address.slice(0, 6)}...{currentAccount.address.slice(-4)}</span>
-                  {copied ? (
-                    <CheckCircle2 className="w-3 h-3 text-[#B99561]" />
-                  ) : (
-                    <Copy className="w-3 h-3 text-[#AEB8AA]" />
-                  )}
-                </button>
-              )}
+          {/* If Live Mode is ON: Show MetaMask Wallet controls */}
+          {isLiveMode ? (
+            !account ? (
               <button
                 onClick={connectWallet}
                 disabled={isConnecting}
-                className="flex items-center space-x-1.5 px-3 py-1.5 rounded bg-[#12231C] hover:bg-[#192C23] border border-[#B99561]/60 text-[#B99561] hover:text-[#c9a674] transition-all text-xs font-medium shadow-sm hover:shadow-[0_0_12px_rgba(185,149,97,0.25)] cursor-pointer"
+                className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded bg-gradient-to-r from-amber-600/30 to-amber-500/20 hover:from-amber-600/40 hover:to-amber-500/30 border border-amber-500/50 text-amber-200 text-[11px] sm:text-xs font-mono font-medium transition-all shadow-sm cursor-pointer"
               >
-                <Wallet className="w-3.5 h-3.5" />
-                <span>{isConnecting ? 'Connecting...' : 'Connect MetaMask'}</span>
+                {isConnecting ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-300" />
+                ) : (
+                  <Wallet className="w-3.5 h-3.5 text-amber-300" />
+                )}
+                <span>Connect MetaMask</span>
               </button>
-            </div>
+            ) : !isSepolia ? (
+              <button
+                onClick={switchToSepolia}
+                className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded bg-amber-950/70 border border-amber-500/60 text-amber-300 text-[11px] sm:text-xs font-mono transition-all cursor-pointer animate-pulse"
+                title="Your wallet is on a different network. Click to switch to Sepolia."
+              >
+                <span>⚠️ Switch to Sepolia</span>
+              </button>
+            ) : (
+              <div className="flex items-center space-x-1 bg-[#12231C] border border-emerald-500/30 rounded px-2 py-1 text-[11px] font-mono">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Connected to Sepolia" />
+                <span className="text-emerald-400 font-semibold hidden md:inline">Sepolia:</span>
+                <button
+                  onClick={() => copyAddress(account)}
+                  title="Click to copy connected address"
+                  className="text-ivory-200 hover:text-white flex items-center space-x-1 cursor-pointer"
+                >
+                  <span>{account.slice(0, 6)}...{account.slice(-4)}</span>
+                  {copied ? <CheckCircle2 className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-sage-muted" />}
+                </button>
+                <span className="text-brass-400 font-bold ml-1 hidden lg:inline">({balance} ETH)</span>
+                <button
+                  onClick={disconnectWallet}
+                  title="Disconnect MetaMask"
+                  className="ml-1 text-sage-muted hover:text-rose-400 p-0.5 transition-colors cursor-pointer"
+                >
+                  <Power className="w-3 h-3" />
+                </button>
+              </div>
+            )
+          ) : (
+            /* Demo Mode: Show active simulated role address */
+            activeRole === 'xray' ? (
+              <div className="flex items-center space-x-1 px-2.5 py-1 sm:py-1.5 rounded bg-purple-950/40 border border-purple-500/30 text-purple-300 text-[11px] sm:text-xs font-mono">
+                <Eye className="w-3 h-3 text-purple-400" />
+                <span>Inspector (Diagnostic)</span>
+              </div>
+            ) : activeRole === 'redteam' ? (
+              <div className="flex items-center space-x-1 px-2.5 py-1 sm:py-1.5 rounded bg-rose-950/40 border border-rose-500/30 text-rose-300 text-[11px] sm:text-xs font-mono">
+                <ShieldAlert className="w-3 h-3 text-rose-400" />
+                <span>Adversary (Audit)</span>
+              </div>
+            ) : currentAccount?.address ? (
+              <button
+                onClick={() => copyAddress(currentAccount.address)}
+                title={`Simulated ${currentAccount.roleLabel}: Click to copy address`}
+                className="flex items-center space-x-1.5 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded bg-[#12231C] border border-[#9DAF9D]/20 hover:border-[#B99561]/40 text-[#AEB8AA] hover:text-[#F3EFE5] transition-colors text-[11px] sm:text-xs cursor-pointer font-mono"
+              >
+                <span className="text-[#B99561] font-semibold">{currentAccount.roleLabel}:</span>
+                <span>{currentAccount.address.slice(0, 6)}...{currentAccount.address.slice(-4)}</span>
+                {copied ? (
+                  <CheckCircle2 className="w-3 h-3 text-[#B99561]" />
+                ) : (
+                  <Copy className="w-3 h-3 text-[#AEB8AA]" />
+                )}
+              </button>
+            ) : null
           )}
-
         </div>
 
       </div>
