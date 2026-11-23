@@ -88,4 +88,50 @@ describe("Client-Side Cryptography Suite: ECDH, ECDSA, AES-GCM, DEK Wrapping", f
         expect(signature).to.be.a("string");
         expect(signature.length).to.be.greaterThan(30);
     });
+
+    it("8. Key rotation on revocation: old DEK cannot decrypt new version, remaining grantee can (M3)", async function () {
+        // Setup: Patient originally shares with Doctor A (doctorKeys) and Doctor B (remaining grantee)
+        const doctorBKeys = await crypto.generateUserKeypairs();
+        const oldDek = encryptedBundle.dekRaw;
+
+        // Revoke Doctor A: Rotate key, increment to version 2, and re-wrap only for Doctor B
+        const rotatedBundle = await crypto.rotateKeyAndReencrypt(
+            sampleFhirRecord,
+            "rec-001",
+            1, // current version
+            [doctorBKeys.publicKeys.ecdh] // only Doctor B remains
+        );
+
+        expect(rotatedBundle.version).to.equal(2);
+        expect(rotatedBundle.rewrappedKeys).to.have.lengthOf(1);
+
+        // Acceptance test: Doctor A's old DEK cannot decrypt version 2
+        try {
+            await crypto.decryptRecord(
+                rotatedBundle.ciphertextBase64,
+                rotatedBundle.ivBase64,
+                oldDek,
+                "rec-001",
+                2
+            );
+            expect.fail("Old DEK should have failed to decrypt rotated record version");
+        } catch (err) {
+            expect(err).to.exist; // AES-GCM auth tag verification fails
+        }
+
+        // Acceptance test: Remaining grantee (Doctor B) can unwrap new DEK and decrypt version 2
+        const unwrappedNewDek = await crypto.unwrapDek(
+            rotatedBundle.rewrappedKeys[0],
+            doctorBKeys.ecdh.privateKey
+        );
+        const decryptedV2 = await crypto.decryptRecord(
+            rotatedBundle.ciphertextBase64,
+            rotatedBundle.ivBase64,
+            unwrappedNewDek,
+            "rec-001",
+            2
+        );
+        expect(decryptedV2.patient).to.equal("Alex Doe");
+        expect(decryptedV2.condition).to.equal("Essential Hypertension (Stage 1)");
+    });
 });

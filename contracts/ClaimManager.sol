@@ -31,6 +31,8 @@ contract ClaimManager is Ownable, ReentrancyGuard {
 
     // Registered active policies (policyCommitment => isRegistered)
     mapping(bytes32 => bool) public registeredPolicies;
+    mapping(bytes32 => uint256) public policyLimit;
+    mapping(bytes32 => uint256) public policySpent;
 
     // Anti-replay nullifiers (claimNullifier => isSpent)
     mapping(bytes32 => bool) public usedNullifiers;
@@ -46,13 +48,15 @@ contract ClaimManager is Ownable, ReentrancyGuard {
         bytes32 indexed policyCommitment,
         uint256 claimAmount,
         address indexed recipient,
-        uint256 payoutWei
+        uint256 payoutWei,
+        uint256 remainingPolicyBalance
     );
     event ConversionRateUpdated(uint256 oldRate, uint256 newRate);
 
     // Custom Errors
     error StaleOrInvalidHospitalRoot();
     error PolicyNotRegistered();
+    error PolicyLimitExceeded();
     error ClaimDateOutOfWindow();
     error NullifierAlreadyUsed();
     error InvalidZKProof();
@@ -83,6 +87,7 @@ contract ClaimManager is Ownable, ReentrancyGuard {
     }
 
     /**
+    /**
      * @notice Deposit funds into the escrow pool (callable via MetaMask by insurer).
      */
     function depositPool() external payable {
@@ -91,10 +96,12 @@ contract ClaimManager is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Register an approved policy commitment. Insurer-only.
+     * @notice Register an approved policy commitment with total policy limit. Insurer-only.
      */
-    function registerPolicy(bytes32 commitment) external onlyOwner {
+     */
+    function registerPolicy(bytes32 commitment, uint256 limit) external onlyOwner {
         registeredPolicies[commitment] = true;
+        policyLimit[commitment] = limit;
         emit PolicyRegistered(commitment, block.timestamp);
     }
 
@@ -142,6 +149,11 @@ contract ClaimManager is Ownable, ReentrancyGuard {
             revert PolicyNotRegistered();
         }
 
+        // CHECK 2b: Total policy coverage check
+        if (policySpent[policyCommitment] + claimAmount > policyLimit[policyCommitment]) {
+            revert PolicyLimitExceeded();
+        }
+
         // CHECK 3: Claim day must be within valid date window
         uint256 currentDay = block.timestamp / 1 days;
         if (claimDay > currentDay || (currentDay - claimDay) > maxClaimAgeDays) {
@@ -159,14 +171,15 @@ contract ClaimManager is Ownable, ReentrancyGuard {
             revert InvalidZKProof();
         }
 
-        // CHECK 6: Escrow solvency check
+        // CHECK 6: Escrow solvency check using escrowBalance (M4 fix)
         uint256 payoutWei = claimAmount * payoutWeiPerRupee;
-        if (address(this).balance < payoutWei) {
+        if (escrowBalance < payoutWei) {
             revert InsufficientEscrowBalance();
         }
 
-        // EFFECT: Consume nullifier BEFORE making payout call
+        // EFFECT: Consume nullifier & track policy spent BEFORE making payout call
         usedNullifiers[nullifier] = true;
+        policySpent[policyCommitment] += claimAmount;
         escrowBalance -= payoutWei;
 
         // INTERACTION: Automatic escrow payout to verified recipient
@@ -175,8 +188,20 @@ contract ClaimManager is Ownable, ReentrancyGuard {
             revert PayoutTransferFailed();
         }
 
-        emit ClaimVerified(nullifier, policyCommitment, claimAmount, recipient, payoutWei);
+        uint256 remainingPolicyBalance = policyLimit[policyCommitment] - policySpent[policyCommitment];
+        emit ClaimVerified(nullifier, policyCommitment, claimAmount, recipient, payoutWei, remainingPolicyBalance);
         return nullifier;
+    }
+
+    /**
+     * @notice Reconcile unaccounted ETH forced into the contract into the escrow balance (M4).
+     */
+    function reconcileEscrow() external onlyOwner {
+        if (address(this).balance > escrowBalance) {
+            uint256 diff = address(this).balance - escrowBalance;
+            escrowBalance = address(this).balance;
+            emit EscrowFunded(msg.sender, diff, escrowBalance);
+        }
     }
 
     receive() external payable {

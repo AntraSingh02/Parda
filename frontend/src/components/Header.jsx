@@ -37,7 +37,8 @@ export default function Header({ activeRole, setActiveRole, currentAccount, onRe
         <div className="flex flex-wrap items-center bg-[#12231C] p-0.5 sm:p-1 rounded border border-[#9DAF9D]/20 order-3 sm:order-2 w-full sm:w-auto justify-center gap-1" aria-label="Role switcher">
           <button
             onClick={() => setActiveRole('patient')}
-            className={`flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs transition-colors ${
+            title="Press [1] to switch to Patient"
+            className={`flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs transition-colors cursor-pointer ${
               activeRole === 'patient'
                 ? 'bg-[#192C23] text-[#F3EFE5] font-medium border border-[#B99561]/40 shadow-sm'
                 : 'text-[#AEB8AA] hover:text-[#F3EFE5]'
@@ -45,11 +46,13 @@ export default function Header({ activeRole, setActiveRole, currentAccount, onRe
           >
             <User className="w-3 h-3 text-[#B99561]" />
             <span>1. Patient</span>
+            <span className="text-[9px] opacity-40 font-mono hidden lg:inline">[1]</span>
           </button>
 
           <button
             onClick={() => setActiveRole('hospital')}
-            className={`flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs transition-colors ${
+            title="Press [2] to switch to Hospital"
+            className={`flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs transition-colors cursor-pointer ${
               activeRole === 'hospital'
                 ? 'bg-[#192C23] text-[#F3EFE5] font-medium border border-[#B99561]/40 shadow-sm'
                 : 'text-[#AEB8AA] hover:text-[#F3EFE5]'
@@ -57,11 +60,13 @@ export default function Header({ activeRole, setActiveRole, currentAccount, onRe
           >
             <Building2 className="w-3 h-3 text-[#B99561]" />
             <span>2. Hospital</span>
+            <span className="text-[9px] opacity-40 font-mono hidden lg:inline">[2]</span>
           </button>
 
           <button
             onClick={() => setActiveRole('insurer')}
-            className={`flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs transition-colors ${
+            title="Press [3] to switch to Insurer"
+            className={`flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs transition-colors cursor-pointer ${
               activeRole === 'insurer'
                 ? 'bg-[#192C23] text-[#F3EFE5] font-medium border border-[#B99561]/40 shadow-sm'
                 : 'text-[#AEB8AA] hover:text-[#F3EFE5]'
@@ -69,13 +74,15 @@ export default function Header({ activeRole, setActiveRole, currentAccount, onRe
           >
             <Landmark className="w-3 h-3 text-[#B99561]" />
             <span>3. Insurer</span>
+            <span className="text-[9px] opacity-40 font-mono hidden lg:inline">[3]</span>
           </button>
 
           <div className="h-4 w-px bg-[#9DAF9D]/20 mx-0.5 hidden md:block" />
 
           <button
             onClick={() => setActiveRole('xray')}
-            className={`flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs transition-colors ${
+            title="Press [4] to view Privacy X-Ray"
+            className={`flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs transition-colors cursor-pointer ${
               activeRole === 'xray'
                 ? 'bg-purple-950/60 text-purple-200 font-medium border border-purple-500/40 shadow-sm'
                 : 'text-purple-400 hover:text-purple-200'
@@ -83,11 +90,13 @@ export default function Header({ activeRole, setActiveRole, currentAccount, onRe
           >
             <Eye className="w-3 h-3 text-purple-400" />
             <span>Privacy X-Ray</span>
+            <span className="text-[9px] opacity-40 font-mono hidden lg:inline">[4]</span>
           </button>
 
           <button
             onClick={() => setActiveRole('redteam')}
-            className={`flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs transition-colors ${
+            title="Press [5] to run Red-Team Attacks"
+            className={`flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs transition-colors cursor-pointer ${
               activeRole === 'redteam'
                 ? 'bg-rose-950/60 text-rose-200 font-medium border border-rose-500/40 shadow-sm'
                 : 'text-rose-400 hover:text-rose-200'
@@ -95,6 +104,7 @@ export default function Header({ activeRole, setActiveRole, currentAccount, onRe
           >
             <ShieldAlert className="w-3 h-3 text-rose-400" />
             <span>Red-Team</span>
+            <span className="text-[9px] opacity-40 font-mono hidden lg:inline">[5]</span>
           </button>
         </div>
 
@@ -103,18 +113,28 @@ export default function Header({ activeRole, setActiveRole, currentAccount, onRe
           <button
             onClick={onReplayIntro}
             aria-label="Replay intro"
-            title="Replay intro"
-            className="p-1.5 sm:p-2 rounded bg-[#12231C] hover:bg-[#192C23] border border-[#9DAF9D]/20 text-[#AEB8AA] hover:text-[#F3EFE5] transition-colors"
+            title="Replay intro animation (Esc)"
+            className="p-1.5 sm:p-2 rounded bg-[#12231C] hover:bg-[#192C23] border border-[#9DAF9D]/20 text-[#AEB8AA] hover:text-[#F3EFE5] transition-colors cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
 
-          {/* Real MetaMask Sepolia Integration */}
-          {account ? (
+          {/* Role Diagnostic Badges */}
+          {activeRole === 'xray' ? (
+            <div className="flex items-center space-x-1 px-2.5 py-1 sm:py-1.5 rounded bg-purple-950/40 border border-purple-500/30 text-purple-300 text-[11px] sm:text-xs font-mono">
+              <Eye className="w-3 h-3 text-purple-400" />
+              <span>Inspector (Diagnostic)</span>
+            </div>
+          ) : activeRole === 'redteam' ? (
+            <div className="flex items-center space-x-1 px-2.5 py-1 sm:py-1.5 rounded bg-rose-950/40 border border-rose-500/30 text-rose-300 text-[11px] sm:text-xs font-mono">
+              <ShieldAlert className="w-3 h-3 text-rose-400" />
+              <span>Adversary (Audit)</span>
+            </div>
+          ) : account ? (
             <div className="relative">
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
-                className="flex items-center space-x-2 px-2.5 py-1.5 rounded bg-[#12231C] border border-[#B99561]/50 text-[#F3EFE5] hover:border-[#B99561] transition-all text-xs"
+                className="flex items-center space-x-2 px-2.5 py-1.5 rounded bg-[#12231C] border border-[#B99561]/50 text-[#F3EFE5] hover:border-[#B99561] transition-all text-xs cursor-pointer"
               >
                 {/* Sepolia Green Badge */}
                 <span className="flex items-center space-x-1 px-1.5 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-500/30 text-[10px]">
@@ -178,7 +198,7 @@ export default function Header({ activeRole, setActiveRole, currentAccount, onRe
                       disconnectWallet();
                       setMenuOpen(false);
                     }}
-                    className="w-full flex items-center justify-center space-x-1.5 py-1.5 rounded bg-rose-950/60 hover:bg-rose-900/60 text-rose-300 border border-rose-500/30 text-xs font-medium transition-colors"
+                    className="w-full flex items-center justify-center space-x-1.5 py-1.5 rounded bg-rose-950/60 hover:bg-rose-900/60 text-rose-300 border border-rose-500/30 text-xs font-medium transition-colors cursor-pointer"
                   >
                     <Power className="w-3 h-3" />
                     <span>Disconnect</span>
@@ -187,14 +207,31 @@ export default function Header({ activeRole, setActiveRole, currentAccount, onRe
               )}
             </div>
           ) : (
-            <button
-              onClick={connectWallet}
-              disabled={isConnecting}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded bg-[#12231C] hover:bg-[#192C23] border border-[#B99561]/60 text-[#B99561] hover:text-[#c9a674] transition-all text-xs font-medium shadow-sm hover:shadow-[0_0_12px_rgba(185,149,97,0.25)]"
-            >
-              <Wallet className="w-3.5 h-3.5" />
-              <span>{isConnecting ? 'Connecting...' : 'Connect MetaMask'}</span>
-            </button>
+            <div className="flex items-center space-x-2">
+              {currentAccount?.address && (
+                <button
+                  onClick={() => copyAddress(currentAccount.address)}
+                  title={`Active ${currentAccount.roleLabel || 'Account'}: Click to copy address`}
+                  className="flex items-center space-x-1.5 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded bg-[#12231C] border border-[#9DAF9D]/20 hover:border-[#B99561]/40 text-[#AEB8AA] hover:text-[#F3EFE5] transition-colors text-[11px] sm:text-xs cursor-pointer font-mono"
+                >
+                  <span className="text-[#B99561] font-semibold">{currentAccount.roleLabel}:</span>
+                  <span>{currentAccount.address.slice(0, 6)}...{currentAccount.address.slice(-4)}</span>
+                  {copied ? (
+                    <CheckCircle2 className="w-3 h-3 text-[#B99561]" />
+                  ) : (
+                    <Copy className="w-3 h-3 text-[#AEB8AA]" />
+                  )}
+                </button>
+              )}
+              <button
+                onClick={connectWallet}
+                disabled={isConnecting}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded bg-[#12231C] hover:bg-[#192C23] border border-[#B99561]/60 text-[#B99561] hover:text-[#c9a674] transition-all text-xs font-medium shadow-sm hover:shadow-[0_0_12px_rgba(185,149,97,0.25)] cursor-pointer"
+              >
+                <Wallet className="w-3.5 h-3.5" />
+                <span>{isConnecting ? 'Connecting...' : 'Connect MetaMask'}</span>
+              </button>
+            </div>
           )}
 
         </div>

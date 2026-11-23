@@ -35,6 +35,7 @@ cache/
 circuits/build/
 *.ptau
 *.zkey
+bin/
 /deployed_addresses.json
 !frontend/src/contracts/deployed_addresses.json
 

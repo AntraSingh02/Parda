@@ -1,15 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
+
 /**
  * @title AccessLog
  * @notice Emits immutable on-chain audit trail events for access grants, revocations,
  * and emergency break-glass requests using ONLY hashed identifiers.
  * Zero plaintext patient names, record CIDs, or diagnoses ever land on-chain.
  */
-contract AccessLog {
+contract AccessLog is Ownable {
     // Break-glass emergency permissions (patientHash => expiryTimestamp)
     mapping(bytes32 => uint256) public activeBreakGlass;
+    mapping(bytes32 => address) public breakGlassResponder;
+
+    // Authorized emergency responders (e.g., registered EMTs, ER departments)
+    mapping(address => bool) public authorizedResponders;
+
+    // Ownership binding: patientHash => patientAddress
+    mapping(bytes32 => address) public patientOwners;
 
     event AccessGranted(
         bytes32 indexed patientHash,
@@ -32,6 +41,28 @@ contract AccessLog {
         uint256 expiryTimestamp
     );
 
+    event ResponderAuthorized(address indexed responder, bool status);
+    event PatientRegistered(bytes32 indexed patientHash, address indexed patient);
+
+    error NotAuthorizedResponder();
+    error NotPatient();
+
+    constructor() Ownable(msg.sender) {}
+
+    function setAuthorizedResponder(address responder, bool status) external onlyOwner {
+        authorizedResponders[responder] = status;
+        emit ResponderAuthorized(responder, status);
+    }
+
+    function registerPatient(bytes32 patientHash) external {
+        if (patientOwners[patientHash] == address(0)) {
+            patientOwners[patientHash] = msg.sender;
+            emit PatientRegistered(patientHash, msg.sender);
+        } else if (patientOwners[patientHash] != msg.sender) {
+            revert NotPatient();
+        }
+    }
+
     /**
      * @notice Log a patient granting time-bound access to a doctor.
      */
@@ -41,6 +72,11 @@ contract AccessLog {
         bytes32 recordHash,
         uint256 expiryTimestamp
     ) external {
+        if (patientOwners[patientHash] == address(0)) {
+            patientOwners[patientHash] = msg.sender;
+        } else if (patientOwners[patientHash] != msg.sender) {
+            revert NotPatient();
+        }
         emit AccessGranted(patientHash, doctorHash, recordHash, expiryTimestamp);
     }
 
@@ -52,6 +88,11 @@ contract AccessLog {
         bytes32 doctorHash,
         bytes32 recordHash
     ) external {
+        if (patientOwners[patientHash] == address(0)) {
+            patientOwners[patientHash] = msg.sender;
+        } else if (patientOwners[patientHash] != msg.sender) {
+            revert NotPatient();
+        }
         emit AccessRevoked(patientHash, doctorHash, recordHash, block.timestamp);
     }
 
@@ -64,8 +105,12 @@ contract AccessLog {
         bytes32 responderHash,
         bytes32 reasonHash
     ) external {
+        if (!authorizedResponders[msg.sender]) {
+            revert NotAuthorizedResponder();
+        }
         uint256 expiry = block.timestamp + 24 hours;
         activeBreakGlass[patientHash] = expiry;
+        breakGlassResponder[patientHash] = msg.sender;
         emit BreakGlassTriggered(patientHash, responderHash, reasonHash, expiry);
     }
 

@@ -17,7 +17,8 @@ async function verifyClaimPreflight(witnessInput) {
         BigInt(witnessInput.patientIdHash),
         BigInt(witnessInput.procedureCode),
         BigInt(witnessInput.claimAmount),
-        BigInt(witnessInput.claimDay)
+        BigInt(witnessInput.claimDay),
+        BigInt(witnessInput.recipient)
     ]);
 
     const pubKey = [
@@ -44,7 +45,11 @@ async function verifyClaimPreflight(witnessInput) {
     let currHospital = hospitalLeaf;
     for (let i = 0; i < witnessInput.hospitalPathElements.length; i++) {
         const sibling = BigInt(witnessInput.hospitalPathElements[i]);
-        const isRight = witnessInput.hospitalPathIndices[i];
+        const isRight = Number(witnessInput.hospitalPathIndices[i]);
+        if (isRight !== 0 && isRight !== 1) {
+            errors.push(`RULE_2_FAILED: Invalid hospital path index ${isRight} at depth ${i} (must be 0 or 1)`);
+            break;
+        }
         if (isRight === 0) {
             currHospital = poseidon([currHospital, sibling]);
         } else {
@@ -61,7 +66,11 @@ async function verifyClaimPreflight(witnessInput) {
     let currProc = procedureLeaf;
     for (let j = 0; j < witnessInput.procedurePathElements.length; j++) {
         const sibling = BigInt(witnessInput.procedurePathElements[j]);
-        const isRight = witnessInput.procedurePathIndices[j];
+        const isRight = Number(witnessInput.procedurePathIndices[j]);
+        if (isRight !== 0 && isRight !== 1) {
+            errors.push(`RULE_3_4_FAILED: Invalid procedure path index ${isRight} at depth ${j} (must be 0 or 1)`);
+            break;
+        }
         if (isRight === 0) {
             currProc = poseidon([currProc, sibling]);
         } else {
