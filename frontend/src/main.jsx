@@ -1,13 +1,15 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App.jsx'
-import { WalletProvider } from './context/WalletContext.jsx'
-import './index.css'
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App.jsx';
+import { Web3Provider } from './context/Web3Context';
+import TransactionBanner from './components/TransactionBanner';
+import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <WalletProvider>
+    <Web3Provider>
       <App />
-    </WalletProvider>
+      <TransactionBanner />
+    </Web3Provider>
   </React.StrictMode>,
-)
+);

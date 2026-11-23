@@ -1,4 +1,6 @@
 const { expect } = require("chai");
+const path = require("path");
+const snarkjs = require("snarkjs");
 const {
     getPoseidon,
     buildMerkleTree,
@@ -8,12 +10,14 @@ const {
 const { verifyClaimPreflight } = require("../circuits/preflight_verifier");
 
 describe("Zero-Knowledge Circuit & Preflight Verification Suite", function () {
-    this.timeout(20000);
+    this.timeout(60000);
     let hospitalPrivKey;
     let hospitalTreeData;
     let policyCredential;
     let validWitness;
     let poseidon;
+    const wasmPath = path.join(__dirname, "../circuits/build/claim_eligibility_js/claim_eligibility.wasm");
+    const zkeyPath = path.join(__dirname, "../circuits/build/claim_eligibility_final.zkey");
 
     before(async function () {
         poseidon = await getPoseidon();
@@ -106,5 +110,67 @@ describe("Zero-Knowledge Circuit & Preflight Verification Suite", function () {
         const result = await verifyClaimPreflight(tamperedSig);
         expect(result.isValid).to.be.false;
         expect(result.errors.some(e => e.includes("Invalid hospital EdDSA signature"))).to.be.true;
+    });
+
+    it("9. Non-binary path index (index = 2) is rejected by preflight (C2)", async function () {
+        const badIdxWitness = {
+            ...validWitness,
+            hospitalPathIndices: [2, ...validWitness.hospitalPathIndices.slice(1)]
+        };
+        const result = await verifyClaimPreflight(badIdxWitness);
+        expect(result.isValid).to.be.false;
+        expect(result.errors.some(e => e.includes("must be 0 or 1"))).to.be.true;
+    });
+
+    it("10. Divergent recipient fails preflight signature check (H4)", async function () {
+        const changedRecipientWitness = {
+            ...validWitness,
+            recipient: "0x0000000000000000000000000000000000001234"
+        };
+        const result = await verifyClaimPreflight(changedRecipientWitness);
+        expect(result.isValid).to.be.false;
+        expect(result.errors.some(e => e.includes("Invalid hospital EdDSA signature"))).to.be.true;
+    });
+
+    it("11. Real circuit calculates witness and generates valid Groth16 proof (C1)", async function () {
+        const { nullifier, ...circuitInput } = validWitness;
+        const { proof, publicSignals } = await snarkjs.groth16.fullProve(
+            circuitInput,
+            wasmPath,
+            zkeyPath
+        );
+        expect(proof).to.exist;
+        expect(publicSignals).to.have.lengthOf(6);
+        expect(publicSignals[0]).to.equal(validWitness.nullifier);
+    });
+
+    it("12. Real circuit witness generation FAILS when path index is 2 (C2 circuit test)", async function () {
+        const { nullifier, ...circuitInput } = validWitness;
+        const badInput = {
+            ...circuitInput,
+            hospitalPathIndices: [2, ...circuitInput.hospitalPathIndices.slice(1)]
+        };
+        try {
+            await snarkjs.groth16.fullProve(badInput, wasmPath, zkeyPath);
+            expect.fail("Circuit witness generation should fail with non-binary path index");
+        } catch (err) {
+            expect(err).to.exist;
+            expect(err.message).to.match(/Assert Failed|Error in template/);
+        }
+    });
+
+    it("13. Real circuit witness generation FAILS when recipient differs from signed recipient (H4 circuit test)", async function () {
+        const { nullifier, ...circuitInput } = validWitness;
+        const forgedRecipientInput = {
+            ...circuitInput,
+            recipient: "9876543210987654321"
+        };
+        try {
+            await snarkjs.groth16.fullProve(forgedRecipientInput, wasmPath, zkeyPath);
+            expect.fail("Circuit witness generation should fail when recipient is not covered by hospital signature");
+        } catch (err) {
+            expect(err).to.exist;
+            expect(err.message).to.match(/Assert Failed|Error in template/);
+        }
     });
 });

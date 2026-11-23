@@ -20,6 +20,9 @@ template MerkleInclusionProof(depth) {
 
     component hashers[depth];
     for (var i = 0; i < depth; i++) {
+        // Enforce pathIndices[i] is boolean (0 or 1)
+        pathIndices[i] * (pathIndices[i] - 1) === 0;
+
         hashers[i] = Poseidon(2);
         // pathIndices[i] == 0 => hash(currentHash, pathElement)
         // pathIndices[i] == 1 => hash(pathElement, currentHash)
@@ -81,14 +84,15 @@ template ClaimEligibility(hospitalDepth, procedureDepth) {
 
     // ----------------------------------------------------
     // CONSTRAINT 1: EdDSA-Poseidon Hospital Signature
-    // msg = Poseidon(recordId, patientIdHash, procedureCode, claimAmount, claimDay)
+    // msg = Poseidon(recordId, patientIdHash, procedureCode, claimAmount, claimDay, recipient)
     // ----------------------------------------------------
-    component msgHasher = Poseidon(5);
+    component msgHasher = Poseidon(6);
     msgHasher.inputs[0] <== recordId;
     msgHasher.inputs[1] <== patientIdHash;
     msgHasher.inputs[2] <== procedureCode;
     msgHasher.inputs[3] <== claimAmount;
     msgHasher.inputs[4] <== claimDay;
+    msgHasher.inputs[5] <== recipient;
 
     component sigVerifier = EdDSAPoseidonVerifier();
     sigVerifier.enabled <== 1;
@@ -175,7 +179,8 @@ template ClaimEligibility(hospitalDepth, procedureDepth) {
 
     // ----------------------------------------------------
     // CONSTRAINT 7: Recipient Address Binding
-    // Prevents front-running / redirection of payout
+    // Recipient is signed by the hospital in Constraint 1.
+    // The dummy squaring constraint below ensures recipient is retained in the circuit.
     // ----------------------------------------------------
     signal recipientCheck;
     recipientCheck <== recipient * recipient;

@@ -232,11 +232,35 @@ async function signRecordVersion(recordId, version, parentHash, ciphertextSha256
     return Buffer.from(signatureBuffer).toString("base64");
 }
 
+/**
+ * 7. Key Rotation and Re-encryption on Access Revocation (M3)
+ * On revocation, generate a fresh DEK, increment the record version (bound into AES-GCM AAD),
+ * re-encrypt the record, and re-wrap the new DEK exclusively for remaining valid grantees.
+ * Note: Data already read prior to revocation cannot be recalled from memory,
+ * but the revoked recipient is cryptographically barred from decrypting the new version.
+ */
+async function rotateKeyAndReencrypt(recordObject, recordId, currentVersion, remainingGranteeJwks = []) {
+    const nextVersion = currentVersion + 1;
+    const encryptedBundle = await encryptRecord(recordObject, recordId, nextVersion);
+
+    const rewrappedKeys = [];
+    for (const granteeJwk of remainingGranteeJwks) {
+        const wrapped = await wrapDekForGrantee(encryptedBundle.dekRaw, granteeJwk);
+        rewrappedKeys.push(wrapped);
+    }
+
+    return {
+        ...encryptedBundle,
+        rewrappedKeys
+    };
+}
+
 module.exports = {
     generateUserKeypairs,
     encryptRecord,
     wrapDekForGrantee,
     unwrapDek,
     decryptRecord,
-    signRecordVersion
+    signRecordVersion,
+    rotateKeyAndReencrypt
 };

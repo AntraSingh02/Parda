@@ -21,6 +21,10 @@ contract AccessRegistry is Ownable {
     // Authorized emergency responders (e.g., registered EMTs, ER departments)
     mapping(address => bool) public authorizedResponders;
 
+    // Time-limited break-glass grants: patient => responder => expiry
+    mapping(address => mapping(address => uint256)) public breakGlassGrants;
+    uint256 public constant BREAK_GLASS_DURATION = 24 hours;
+
     // Audit Trail Events
     event AccessGranted(
         address indexed patient,
@@ -99,12 +103,16 @@ contract AccessRegistry is Ownable {
      * @notice Check if a doctor has active access to a patient's record.
      * Emits an on-chain audit trail event.
      */
+    /**
+     * @notice Check if the caller (doctor/accessor) has active access to a patient's record.
+     * Records msg.sender as the accessor in the on-chain audit trail.
+     */
     function verifyAndLogAccess(
         address patient,
-        address doctor,
         string calldata recordCid
-    ) external returns (bool) {
-        AccessPermission memory p = permissions[patient][doctor][recordCid];
+    ) public returns (bool) {
+        address accessor = msg.sender;
+        AccessPermission memory p = permissions[patient][accessor][recordCid];
 
         bool valid = false;
         if (p.isGranted) {
@@ -113,19 +121,38 @@ contract AccessRegistry is Ownable {
             }
         }
 
-        emit RecordAccessChecked(patient, doctor, recordCid, valid, block.timestamp);
+        // Honor emergency break-glass grant
+        if (!valid && block.timestamp <= breakGlassGrants[patient][accessor] && breakGlassGrants[patient][accessor] > 0) {
+            valid = true;
+        }
+
+        emit RecordAccessChecked(patient, accessor, recordCid, valid, block.timestamp);
         return valid;
     }
 
     /**
+     * @notice Overload for backwards compatibility: logs msg.sender as real caller.
+     */
+    function verifyAndLogAccess(
+        address patient,
+        address /* doctor */,
+        string calldata recordCid
+    ) external returns (bool) {
+        return verifyAndLogAccess(patient, recordCid);
+    }
+
+    /**
      * @notice Emergency "Break-Glass" access for responders when a patient is incapacitated.
-     * Fully logged on-chain for post-incident medical audits.
+     * Grants time-limited access and fully logs on-chain for post-incident medical audits.
      */
     function emergencyBreakGlass(
         address patient,
         string calldata reason
     ) external {
-        // Must be authorized responder or emit high-severity audit log
+        if (!authorizedResponders[msg.sender]) {
+            revert Unauthorized();
+        }
+        breakGlassGrants[patient][msg.sender] = block.timestamp + BREAK_GLASS_DURATION;
         emit EmergencyBreakGlass(patient, msg.sender, reason, block.timestamp);
     }
 }

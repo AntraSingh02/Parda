@@ -106,18 +106,19 @@ async function createPolicyCredential({ patientIdHash, coveredProcedures, policy
 /**
  * Signs the claim message using the hospital's EdDSA Baby Jubjub private key
  */
-async function signClaimMessage({ hospitalPrivKeyHex, recordId, patientIdHash, procedureCode, claimAmount, claimDay }) {
+async function signClaimMessage({ hospitalPrivKeyHex, recordId, patientIdHash, procedureCode, claimAmount, claimDay, recipient }) {
     const poseidon = await getPoseidon();
     const eddsa = await getEddsa();
     const F = poseidon.F;
 
-    // msg = Poseidon(5)([recordId, patientIdHash, procedureCode, claimAmount, claimDay])
+    // msg = Poseidon(6)([recordId, patientIdHash, procedureCode, claimAmount, claimDay, recipient])
     const msgHash = poseidon([
         BigInt(recordId),
         BigInt(patientIdHash),
         BigInt(procedureCode),
         BigInt(claimAmount),
-        BigInt(claimDay)
+        BigInt(claimDay),
+        BigInt(recipient)
     ]);
 
     const privKeyBuffer = Buffer.from(hospitalPrivKeyHex.replace("0x", ""), "hex");
@@ -170,7 +171,8 @@ async function generateCircuitWitnessInput({
         patientIdHash: policyCredential.patientIdHash,
         procedureCode,
         claimAmount,
-        claimDay
+        claimDay,
+        recipient
     });
 
     // 4. Nullifier = Poseidon(policySalt, recordId)
