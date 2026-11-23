@@ -25,6 +25,7 @@ out/
 coverage/
 
 # Hardhat & Circom
+.cache/
 artifacts/
 cache/
 circuits/build/

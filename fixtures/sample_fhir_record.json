@@ -1,0 +1,42 @@
+{
+  "resourceType": "Bundle",
+  "id": "bundle-alex-doe-2024",
+  "type": "collection",
+  "timestamp": "2024-11-23T04:00:00Z",
+  "entry": [
+    {
+      "fullUrl": "urn:uuid:patient-001",
+      "resource": {
+        "resourceType": "Patient",
+        "id": "patient-001",
+        "name": [{ "use": "official", "family": "Doe", "given": ["Alex"] }],
+        "gender": "other",
+        "birthDate": "1992-05-14"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:condition-001",
+      "resource": {
+        "resourceType": "Condition",
+        "id": "condition-001",
+        "clinicalStatus": "active",
+        "code": {
+          "coding": [{ "system": "http://hl7.org/fhir/sid/icd-10", "code": "I10", "display": "Essential hypertension" }],
+          "text": "Essential (primary) hypertension"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:procedure-001",
+      "resource": {
+        "resourceType": "Procedure",
+        "id": "procedure-001",
+        "status": "completed",
+        "code": {
+          "coding": [{ "system": "http://www.ama-assn.org/go/cpt", "code": "99213" }],
+          "text": "Outpatient consultation, 20-29 mins"
+        }
+      }
+    }
+  ]
+}
