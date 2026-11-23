@@ -4,28 +4,160 @@
 
 @layer base {
   body {
-    background-color: #030712;
-    color: #f8fafc;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: #0B1713;
+    color: #F3EFE5;
+    font-family: 'Plus Jakarta Sans', Inter, system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
   }
   
-  code, pre {
+  code, pre, .font-mono {
     font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .font-serif {
+    font-family: 'Fraunces', Georgia, serif;
+    font-optical-sizing: auto;
   }
 }
 
-/* Custom scrollbar */
+/* Layered Forest Surfaces */
+.parda-surface {
+  background-color: #12231C;
+  border: 1px solid rgba(157, 175, 157, 0.16);
+  border-radius: 6px;
+}
+
+.parda-surface-elevated {
+  background-color: #192C23;
+  border: 1px solid rgba(157, 175, 157, 0.22);
+  border-radius: 6px;
+}
+
+/* Subtle, Restrained Dot Matrix (Warm Sage, Sparse) */
+.parda-dot-pattern {
+  background-image: radial-gradient(rgba(157, 175, 157, 0.08) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.parda-grid-pattern {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(157, 175, 157, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(157, 175, 157, 0.035) 1px, transparent 1px);
+}
+
+/* Antique Brass Action Button */
+.btn-brass {
+  background: linear-gradient(110deg, #12231C 10%, #223B30 25%, #12231C 40%);
+  background-size: 200% 100%;
+  border: 1px solid rgba(185, 149, 97, 0.5);
+  color: #F3EFE5;
+  transition: all 0.2s ease;
+}
+
+.btn-brass:hover {
+  border-color: #B99561;
+  background-color: #192C23;
+  box-shadow: 0 4px 16px rgba(185, 149, 97, 0.15);
+}
+
+/* Redacted Clinical Bars */
+.parda-redacted-bar {
+  display: inline-flex;
+  align-items: center;
+  background-color: #060E0B;
+  border: 1px solid rgba(157, 175, 157, 0.35);
+  color: transparent;
+  user-select: none;
+  padding: 1px 8px;
+  border-radius: 3px;
+  cursor: help;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.parda-redacted-bar:hover, .parda-redacted-bar:focus {
+  background-color: #162820;
+  border-color: #B99561;
+}
+
+.parda-popover {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #060E0B;
+  border: 1px solid #B99561;
+  border-radius: 4px;
+  padding: 8px 12px;
+  z-index: 50;
+  width: 280px;
+  color: #F3EFE5;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 11px;
+  line-height: 1.45;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+.parda-redacted-bar:hover .parda-popover,
+.parda-redacted-bar:focus .parda-popover {
+  display: block;
+}
+
+/* Rotating Privacy Veil Keyframes */
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes spinReverse {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes pulseGently {
+  0%, 100% { opacity: 0.4; transform: scale(0.98); }
+  50% { opacity: 0.85; transform: scale(1.02); }
+}
+
+.animate-spin-slow {
+  animation: spinSlow 32s linear infinite;
+}
+
+.animate-spin-reverse {
+  animation: spinReverse 40s linear infinite;
+}
+
+.animate-pulse-gentle {
+  animation: pulseGently 4s ease-in-out infinite;
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0b0f19;
+  background: #0B1713;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
-  border-radius: 4px;
+  background: #192C23;
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  background: #B99561;
 }

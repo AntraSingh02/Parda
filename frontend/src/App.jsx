@@ -1,14 +1,32 @@
 import React, { useState } from 'react';
 import Header from './components/Header';
+import PardaOpeningSequence from './components/PardaOpeningSequence';
 import PatientPortal from './components/PatientPortal';
 import HospitalPortal from './components/HospitalPortal';
 import InsurerPortal from './components/InsurerPortal';
 import { MOCK_ACCOUNTS } from './data/mockData';
+import { Shield, Sparkles, User, Building2, Landmark, Lock, Cpu, EyeOff } from 'lucide-react';
 
 export default function App() {
-  const [activeRole, setActiveRole] = useState('patient'); // 'patient' | 'hospital' | 'insurer'
+  const [activeRole, setActiveRole] = useState(() => {
+    const p = new URLSearchParams(window.location.search).get('role');
+    return ['patient', 'hospital', 'insurer'].includes(p) ? p : 'patient';
+  });
+
+  // Dedicated full-screen interactive Parda intro control
+  const [showIntro, setShowIntro] = useState(() => {
+    const p = new URLSearchParams(window.location.search).get('intro');
+    if (p === '1') return true;
+    if (p === '0') return false;
+    return !sessionStorage.getItem('parda_intro_seen_v4');
+  });
+
+  const handleIntroComplete = () => {
+    sessionStorage.setItem('parda_intro_seen_v4', 'true');
+    setShowIntro(false);
+  };
   
-  // Shared Workflow State
+  // Shared Workflow State (100% Preserved)
   const [isEncrypted, setIsEncrypted] = useState(false);
   const [ipfsCid, setIpfsCid] = useState('bafybeic23ae33cd09cec6723c0b92cb16438072');
   const [doctorAccessGranted, setDoctorAccessGranted] = useState(false);
@@ -20,7 +38,7 @@ export default function App() {
     {
       type: 'INIT',
       title: 'Insurance Pool Initialized',
-      detail: 'Liquidity funded with 10.0 ETH | Approved Hospital Root Set',
+      detail: 'Liquidity funded with 10.0 ETH | Approved Hospital Merkle Root Set',
       time: '04:00:00 AM',
     },
     {
@@ -38,56 +56,89 @@ export default function App() {
   const currentAccount = MOCK_ACCOUNTS[activeRole];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
-      {/* Header with Role Switcher */}
+    <div className="min-h-screen bg-forest-900 text-ivory-200 flex flex-col justify-between selection:bg-brass-500 selection:text-forest-950">
+      
+      {/* ===================================================================== */}
+      {/* 1. DEDICATED FULL-SCREEN PARDA INTERACTIVE INTRO (ON CLEAN LOAD / REPLAY) */}
+      {/* ===================================================================== */}
+      {showIntro && (
+        <PardaOpeningSequence onComplete={handleIntroComplete} />
+      )}
+
+      {/* Top Header Navigation */}
       <Header
         activeRole={activeRole}
         setActiveRole={setActiveRole}
         currentAccount={currentAccount}
+        onReplayIntro={() => setShowIntro(true)}
       />
 
-      {/* Main Workflow View */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
-        {activeRole === 'patient' && (
-          <PatientPortal
-            isEncrypted={isEncrypted}
-            setIsEncrypted={setIsEncrypted}
-            ipfsCid={ipfsCid}
-            setIpfsCid={setIpfsCid}
-            doctorAccessGranted={doctorAccessGranted}
-            setDoctorAccessGranted={setDoctorAccessGranted}
-            addAuditLog={addAuditLog}
-          />
-        )}
-
+      {/* ===================================================================== */}
+      {/* 2. THE WORKING DAPP DASHBOARD (CLEAN, FOCUSED & BREATHING) */}
+      {/* ===================================================================== */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeRole === 'hospital' && (
-          <HospitalPortal
-            doctorAccessGranted={doctorAccessGranted}
-            claimSettled={claimSettled}
-            setClaimSettled={setClaimSettled}
-            hospitalBalance={hospitalBalance}
-            setHospitalBalance={setHospitalBalance}
-            addAuditLog={addAuditLog}
-            setActiveRole={setActiveRole}
-          />
+          <h1 className="text-xl sm:text-2xl font-serif font-normal text-[#F3EFE5] mb-6">
+            Hospital Provider Enclave
+          </h1>
+        )}
+        {activeRole === 'insurer' && (
+          <h1 className="text-xl sm:text-2xl font-serif font-normal text-[#F3EFE5] mb-6">
+            Underwriter Settlement Ledger
+          </h1>
         )}
 
-        {activeRole === 'insurer' && (
-          <InsurerPortal
-            claimSettled={claimSettled}
-            auditLogs={auditLogs}
-            addAuditLog={addAuditLog}
-          />
-        )}
+        {/* Active Role Portal */}
+        <section>
+          {activeRole === 'patient' && (
+            <PatientPortal
+              isEncrypted={isEncrypted}
+              setIsEncrypted={setIsEncrypted}
+              ipfsCid={ipfsCid}
+              setIpfsCid={setIpfsCid}
+              doctorAccessGranted={doctorAccessGranted}
+              setDoctorAccessGranted={setDoctorAccessGranted}
+              addAuditLog={addAuditLog}
+            />
+          )}
+
+          {activeRole === 'hospital' && (
+            <HospitalPortal
+              doctorAccessGranted={doctorAccessGranted}
+              claimSettled={claimSettled}
+              setClaimSettled={setClaimSettled}
+              hospitalBalance={hospitalBalance}
+              setHospitalBalance={setHospitalBalance}
+              addAuditLog={addAuditLog}
+              setActiveRole={setActiveRole}
+            />
+          )}
+
+          {activeRole === 'insurer' && (
+            <InsurerPortal
+              claimSettled={claimSettled}
+              auditLogs={auditLogs}
+              addAuditLog={addAuditLog}
+            />
+          )}
+        </section>
+
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950 py-6 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>Parda • Built for Hack-a-Sol 5.0 (Track 4: Web3 · W3-01)</span>
-          <span className="font-mono text-indigo-400/80">Circom 2.1 + Groth16 + Solidity 0.8.20 + HL7 FHIR</span>
+      <footer className="border-t border-sage-500/20 bg-forest-950 py-6 text-xs text-sage-muted font-mono">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center space-x-2">
+            <span className="font-bold text-ivory-200 tracking-wide font-serif">PARDA PROTOCOL</span>
+            <span>•</span>
+            <span>BUILT FOR HACK-A-SOL 5.0 (W3-01)</span>
+          </div>
+          <span className="text-brass-400/90">
+            Circom 2.1 + Groth16 zk-SNARKs + Solidity 0.8.20 + HL7 FHIR R4
+          </span>
         </div>
       </footer>
+
     </div>
   );
 }
