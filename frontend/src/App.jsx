@@ -1,32 +1,68 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import PardaOpeningSequence from './components/PardaOpeningSequence';
 import PatientPortal from './components/PatientPortal';
 import HospitalPortal from './components/HospitalPortal';
 import InsurerPortal from './components/InsurerPortal';
+import PrivacyXRay from './components/PrivacyXRay';
+import RedTeamPanel from './components/RedTeamPanel';
 import { MOCK_ACCOUNTS } from './data/mockData';
-import { Shield, Sparkles, User, Building2, Landmark, Lock, Cpu, EyeOff } from 'lucide-react';
+
+const ALLOWED_ROLES = ['patient', 'hospital', 'insurer', 'xray', 'redteam'];
 
 export default function App() {
-  const [activeRole, setActiveRole] = useState(() => {
-    const p = new URLSearchParams(window.location.search).get('role');
-    return ['patient', 'hospital', 'insurer'].includes(p) ? p : 'patient';
+  // 1. Read Role from URI Query String (?role=patient | hospital | insurer | xray | redteam)
+  const [activeRole, setActiveRoleState] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search).get('role');
+      if (ALLOWED_ROLES.includes(p)) return p;
+    }
+    return 'patient';
   });
 
-  // Dedicated full-screen interactive Parda intro control
+  // 2. Synchronize Role changes to the Browser URI (?role=...)
+  const handleRoleChange = (role) => {
+    if (ALLOWED_ROLES.includes(role)) {
+      setActiveRoleState(role);
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        url.searchParams.set('role', role);
+        window.history.replaceState({ role }, '', url.toString());
+      }
+    }
+  };
+
+  // 3. Listen to browser back/forward buttons (popstate)
+  useEffect(() => {
+    const handlePopState = () => {
+      const p = new URLSearchParams(window.location.search).get('role');
+      if (ALLOWED_ROLES.includes(p)) {
+        setActiveRoleState(p);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Dedicated full-screen interactive Parda intro control (?intro=1)
   const [showIntro, setShowIntro] = useState(() => {
-    const p = new URLSearchParams(window.location.search).get('intro');
-    if (p === '1') return true;
-    if (p === '0') return false;
-    return !sessionStorage.getItem('parda_intro_seen_v4');
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search).get('intro');
+      if (p === '1') return true;
+      if (p === '0') return false;
+      return !sessionStorage.getItem('parda_intro_seen_v4');
+    }
+    return false;
   });
 
   const handleIntroComplete = () => {
-    sessionStorage.setItem('parda_intro_seen_v4', 'true');
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('parda_intro_seen_v4', 'true');
+    }
     setShowIntro(false);
   };
   
-  // Shared Workflow State (100% Preserved)
+  // Shared Workflow State
   const [isEncrypted, setIsEncrypted] = useState(false);
   const [ipfsCid, setIpfsCid] = useState('bafybeic23ae33cd09cec6723c0b92cb16438072');
   const [doctorAccessGranted, setDoctorAccessGranted] = useState(false);
@@ -44,7 +80,7 @@ export default function App() {
     {
       type: 'RECORD_PINNED',
       title: 'Patient Encrypted Record Anchored',
-      detail: 'CID: bafybeic23ae33cd09cec... | SHA-256 On-Chain Commitment',
+      detail: 'CID: bafybeic23ae33cd09cec... | SHA-256 On-Chain Ciphertext Commitment',
       time: '04:02:15 AM',
     }
   ]);
@@ -53,10 +89,10 @@ export default function App() {
     setAuditLogs((prev) => [log, ...prev]);
   };
 
-  const currentAccount = MOCK_ACCOUNTS[activeRole];
+  const currentAccount = MOCK_ACCOUNTS[activeRole] || MOCK_ACCOUNTS['patient'];
 
   return (
-    <div className="min-h-screen bg-forest-900 text-ivory-200 flex flex-col justify-between selection:bg-brass-500 selection:text-forest-950">
+    <div className="min-h-screen bg-forest-900 text-ivory-200 flex flex-col justify-between selection:bg-brass-500 selection:text-forest-950 font-sans">
       
       {/* ===================================================================== */}
       {/* 1. DEDICATED FULL-SCREEN PARDA INTERACTIVE INTRO (ON CLEAN LOAD / REPLAY) */}
@@ -65,16 +101,16 @@ export default function App() {
         <PardaOpeningSequence onComplete={handleIntroComplete} />
       )}
 
-      {/* Top Header Navigation */}
+      {/* Top Header Navigation with URI-Linked Tabs */}
       <Header
         activeRole={activeRole}
-        setActiveRole={setActiveRole}
+        setActiveRole={handleRoleChange}
         currentAccount={currentAccount}
         onReplayIntro={() => setShowIntro(true)}
       />
 
       {/* ===================================================================== */}
-      {/* 2. THE WORKING DAPP DASHBOARD (CLEAN, FOCUSED & BREATHING) */}
+      {/* 2. THE WORKING DAPP DASHBOARD */}
       {/* ===================================================================== */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeRole === 'hospital' && (
@@ -88,7 +124,7 @@ export default function App() {
           </h1>
         )}
 
-        {/* Active Role Portal */}
+        {/* Active Role or Verification Panel */}
         <section>
           {activeRole === 'patient' && (
             <PatientPortal
@@ -110,7 +146,7 @@ export default function App() {
               hospitalBalance={hospitalBalance}
               setHospitalBalance={setHospitalBalance}
               addAuditLog={addAuditLog}
-              setActiveRole={setActiveRole}
+              setActiveRole={handleRoleChange}
             />
           )}
 
@@ -118,6 +154,18 @@ export default function App() {
             <InsurerPortal
               claimSettled={claimSettled}
               auditLogs={auditLogs}
+              addAuditLog={addAuditLog}
+            />
+          )}
+
+          {activeRole === 'xray' && (
+            <PrivacyXRay
+              claimSettled={claimSettled}
+            />
+          )}
+
+          {activeRole === 'redteam' && (
+            <RedTeamPanel
               addAuditLog={addAuditLog}
             />
           )}

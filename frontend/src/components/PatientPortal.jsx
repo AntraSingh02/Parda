@@ -344,15 +344,23 @@ export default function PatientPortal({
           </div>
           <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
             <span className="text-[#AEB8AA]/70">Coverage Limit</span>
-            <span className="text-[#F3EFE5]">{MOCK_PATIENT.policyLimitEth} ETH</span>
+            <span className="text-[#F3EFE5]">{MOCK_PATIENT.policyLimitEth} ETH (₹50,000)</span>
           </div>
           <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-            <span className="text-[#AEB8AA]/70">Access Registry Contract</span>
-            <span className="text-[#F3EFE5] break-all">0x5FbDB2315678afecb367f032d93F642f64180aa3</span>
+            <span className="text-[#AEB8AA]/70">Client Key Management</span>
+            <span className="text-[#F3EFE5]">WebCrypto ECDH P-256 + ECDSA P-256</span>
           </div>
           <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-            <span className="text-[#AEB8AA]/70">Verifier Contract</span>
-            <span className="text-[#F3EFE5] break-all">0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512</span>
+            <span className="text-[#AEB8AA]/70">DEK Encryption</span>
+            <span className="text-[#F3EFE5]">AES-256-GCM + Ephemeral ECDH Key Wrapping</span>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
+            <span className="text-[#AEB8AA]/70">Claim Manager Contract</span>
+            <span className="text-[#F3EFE5] break-all">0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0</span>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
+            <span className="text-[#AEB8AA]/70">Hospital Registry (2-of-3 Multi-Sig)</span>
+            <span className="text-[#F3EFE5] break-all">0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9</span>
           </div>
           <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
             <span className="text-[#AEB8AA]/70">HL7 Schema</span>
@@ -363,12 +371,12 @@ export default function PatientPortal({
             <span className="text-[#F3EFE5] break-all">{ipfsCid}</span>
           </div>
           <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-            <span className="text-[#AEB8AA]/70">Commitment Hash</span>
-            <span className="text-[#F3EFE5] break-all">0x8f9b2d41a7e201bb...9a21e0</span>
+            <span className="text-[#AEB8AA]/70">Anchored Ciphertext SHA-256</span>
+            <span className="text-[#F3EFE5] break-all">0x131bc61030e2849f...9e195b (Ciphertext Only)</span>
           </div>
           <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
             <span className="text-[#AEB8AA]/70">Circom Nullifier</span>
-            <span className="text-[#F3EFE5] break-all">0x7c8149d92b0...00ae</span>
+            <span className="text-[#F3EFE5] break-all">Poseidon(policySalt, recordId)</span>
           </div>
         </div>
       </details>

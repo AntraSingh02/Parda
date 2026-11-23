@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "description": "Privacy-Preserving Health Records & ZKP Insurance Claims Prototype",
   "scripts": {
+    "demo": "hardhat run scripts/demo.js",
+    "test:crypto": "mocha --timeout 10000 test/crypto.test.js",
+    "test:zk": "mocha --timeout 20000 test/zk_circuit.test.js",
+    "test:contracts": "hardhat test test/contracts.test.js",
+    "test": "npm run test:crypto && npm run test:zk && npm run test:contracts",
     "frontend:dev": "npm --prefix frontend run dev",
     "frontend:build": "npm --prefix frontend run build",
     "circuits:compile": "circom circuits/claim_verifier.circom --r1cs --wasm --sym -o circuits/build",

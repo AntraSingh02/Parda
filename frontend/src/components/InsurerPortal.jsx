@@ -215,9 +215,33 @@ export default function InsurerPortal({
           </div>
         </div>
 
-        {/* Right: Emergency Break-Glass & Live Audit Feed */}
+        {/* Right: Public Signals, Emergency Break-Glass & Live Audit Feed */}
         <div className="lg:col-span-4 space-y-6">
           
+          {/* Public Calldata Signals Card */}
+          <div className="parda-surface p-6 space-y-3.5 border-l-2 border-l-brass-500">
+            <div className="flex items-center justify-between border-b border-sage-500/20 pb-3">
+              <div className="flex items-center space-x-2 text-brass-400">
+                <ShieldCheck className="w-4 h-4 text-brass-400" />
+                <h3 className="text-base font-serif font-normal text-ivory-200">Public Signals (6 Fields)</h3>
+              </div>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-forest-900 border border-brass-500/30 text-brass-400">
+                EVM Calldata
+              </span>
+            </div>
+            <p className="text-xs text-sage-muted leading-relaxed font-sans">
+              Strictly zero medical inputs reach the contract. The ClaimManager verifies these 6 public field elements:
+            </p>
+            <div className="space-y-1.5 font-mono text-[11px] text-sage-muted bg-forest-850 p-3 rounded border border-sage-500/15">
+              <div><span className="text-brass-400">[0] nullifier:</span> Poseidon(salt, recordId)</div>
+              <div><span className="text-brass-400">[1] hospitalRoot:</span> 2-of-3 Multi-Sig Root</div>
+              <div><span className="text-brass-400">[2] commitment:</span> Policy Hash Anchor</div>
+              <div><span className="text-brass-400">[3] claimAmount:</span> ₹15,000 (1.5 ETH)</div>
+              <div><span className="text-brass-400">[4] claimDay:</span> Day 20,050</div>
+              <div><span className="text-brass-400">[5] recipient:</span> 0x7099...79C8 (Bound)</div>
+            </div>
+          </div>
+
           {/* Emergency Break-Glass Card */}
           <div className="parda-surface p-6 space-y-3.5 border-l-2 border-l-brass-500">
             <div className="flex items-center space-x-2 text-brass-400">

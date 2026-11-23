@@ -18,11 +18,12 @@ export default function HospitalPortal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [nullifier, setNullifier] = useState(null);
 
-  // Stepped ZK Prover Simulation
+  // Stepped ZK Prover for 7 Constraints in claim_eligibility.circom
   const handleGenerateProof = () => {
     setIsProving(true);
     setProverStep(1);
 
+    const stepInterval = 450;
     setTimeout(() => {
       setProverStep(2);
       setTimeout(() => {
@@ -30,24 +31,32 @@ export default function HospitalPortal({
         setTimeout(() => {
           setProverStep(4);
           setTimeout(() => {
-            const generatedNullifier = "0x" + Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join('');
-            setNullifier(generatedNullifier);
-            setProofGenerated(true);
-            setIsProving(false);
             setProverStep(5);
-            addAuditLog({
-              type: 'PROOF_GENERATED',
-              title: 'Groth16 Zero-Knowledge Proof Generated',
-              detail: `Nullifier: ${generatedNullifier.slice(0, 16)}... | Diagnosis & Procedure 100% hidden`,
-              time: new Date().toLocaleTimeString(),
-            });
-          }, 550);
-        }, 550);
-      }, 550);
-    }, 550);
+            setTimeout(() => {
+              setProverStep(6);
+              setTimeout(() => {
+                const generatedNullifier = "0x" + Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join('');
+                setNullifier(generatedNullifier);
+                setProofGenerated(true);
+                setIsProving(false);
+                setProverStep(7);
+                if (addAuditLog) {
+                  addAuditLog({
+                    type: 'PROOF_GENERATED',
+                    title: 'Groth16 Zero-Knowledge Proof Generated (7 Constraints Satisfied)',
+                    detail: `Nullifier: ${generatedNullifier.slice(0, 16)}... | EdDSA Signature & Diagnosis 100% hidden`,
+                    time: new Date().toLocaleTimeString(),
+                  });
+                }
+              }, stepInterval);
+            }, stepInterval);
+          }, stepInterval);
+        }, stepInterval);
+      }, stepInterval);
+    }, stepInterval);
   };
 
-  // Submit Claim to InsuranceSettlement.sol
+  // Submit Claim to ClaimManager.sol
   const handleSubmitClaim = () => {
     setIsSubmitting(true);
     setTimeout(() => {
@@ -56,17 +65,19 @@ export default function HospitalPortal({
       const newBal = (parseFloat(hospitalBalance) + parseFloat(claimAmount)).toFixed(2) + " ETH";
       setHospitalBalance(newBal);
 
-      addAuditLog({
-        type: 'CLAIM_SETTLED',
-        title: 'Claim Verified & Settled on Sepolia Testnet',
-        detail: `Transferred ${claimAmount} ETH to St. Jude Medical Treasury | Nullifier marked spent`,
-        time: new Date().toLocaleTimeString(),
-      });
-    }, 900);
+      if (addAuditLog) {
+        addAuditLog({
+          type: 'CLAIM_SETTLED',
+          title: 'Claim Verified & Settled via ClaimManager.sol',
+          detail: `Transferred ${claimAmount} ETH to St. Jude Medical Treasury | Nullifier marked spent on-chain`,
+          time: new Date().toLocaleTimeString(),
+        });
+      }
+    }, 800);
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       
       {/* Top Banner with Forest & Brass Accents */}
       <div className="parda-surface p-6 border-l-4 border-l-brass-500">
@@ -74,13 +85,13 @@ export default function HospitalPortal({
           <div className="space-y-1">
             <div className="inline-flex items-center gap-2 text-brass-400 text-xs font-mono font-semibold uppercase tracking-wider">
               <Building2 className="w-4 h-4 text-brass-400" />
-              <span>Provider Claim Engine • Circom Prover Node</span>
+              <span>Provider Claim Engine • Circom 2.1 Prover Node</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-serif text-ivory-200 tracking-tight">
               St. Jude Medical Center Enclave
             </h2>
             <p className="text-xs sm:text-sm text-sage-muted max-w-2xl font-sans">
-              Compile local clinical electronic records into a succinct zero-knowledge attestation. Only cryptographic proof scalars are transmitted across the boundary to the blockchain.
+              Compile local clinical electronic records into a succinct Groth16 zero-knowledge attestation. Only cryptographic proof scalars are transmitted to the insurer's ClaimManager contract.
             </p>
           </div>
           
@@ -138,12 +149,12 @@ export default function HospitalPortal({
                   <span className="text-brass-400 font-bold">{MOCK_PATIENT.policyId}</span>
                 </div>
                 <div className="flex items-center justify-between text-sage-muted">
-                  <span>MAX COVERAGE:</span>
-                  <span className="font-bold text-ivory-200">{MOCK_PATIENT.policyLimitEth} ETH</span>
+                  <span>COVERAGE LIMIT:</span>
+                  <span className="font-bold text-ivory-200">₹50,000 (5.0 ETH)</span>
                 </div>
                 <div className="flex items-center justify-between text-sage-muted">
                   <span>POLICY EXPIRY:</span>
-                  <span className="text-sage-300">{MOCK_PATIENT.policyExpiry} (Active)</span>
+                  <span className="text-sage-300">Day 22,500 (Active)</span>
                 </div>
               </div>
 
@@ -157,7 +168,7 @@ export default function HospitalPortal({
                 </div>
                 <div className="text-sm font-semibold text-ivory-200 font-sans">{MOCK_FHIR_RECORD.condition.display}</div>
                 <div className="text-xs text-sage-muted font-mono">
-                  ICD-10: <span className="text-brass-400">{MOCK_FHIR_RECORD.condition.code}</span> | CPT: {MOCK_FHIR_RECORD.procedure.code}
+                  ICD-10: <span className="text-brass-400">{MOCK_FHIR_RECORD.condition.code}</span> | CPT: {MOCK_FHIR_RECORD.procedure.code} (Covered)
                 </div>
               </div>
 
@@ -186,21 +197,38 @@ export default function HospitalPortal({
                   className="btn-brass w-full flex items-center justify-center space-x-2 font-mono text-xs font-medium py-3 rounded cursor-pointer"
                 >
                   <Cpu className="w-4 h-4 text-brass-400" />
-                  <span>{isProving ? "Synthesizing Groth16 Circuit Proof..." : "Generate Zero-Knowledge Proof"}</span>
+                  <span>{isProving ? `Solving Constraint ${proverStep}/7...` : "Generate Zero-Knowledge Proof (7 Constraints)"}</span>
                 </button>
               ) : (
-                <div className="bg-forest-850 border border-brass-500/40 rounded p-3.5 flex items-center justify-between text-xs text-ivory-200 font-mono">
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle2 className="w-4 h-4 text-brass-400" />
-                    <span>Proof Generated & Witness Synthesized!</span>
+                <div className="space-y-3">
+                  <div className="bg-forest-850 border border-brass-500/40 rounded p-3.5 flex items-center justify-between text-xs text-ivory-200 font-mono">
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle2 className="w-4 h-4 text-brass-400" />
+                      <span>Groth16 Proof Synthesized!</span>
+                    </div>
+                    <span className="font-bold text-brass-400">7 Constraints Valid</span>
                   </div>
-                  <span className="font-bold text-brass-400">Groth16 Valid</span>
+
+                  {!claimSettled ? (
+                    <button
+                      onClick={handleSubmitClaim}
+                      disabled={isSubmitting}
+                      className="btn-brass w-full flex items-center justify-center space-x-2 font-mono text-xs font-medium py-3 rounded cursor-pointer"
+                    >
+                      <Send className="w-4 h-4 text-brass-400" />
+                      <span>{isSubmitting ? "Settling with ClaimManager.sol..." : "Submit Proof to ClaimManager.sol"}</span>
+                    </button>
+                  ) : (
+                    <div className="bg-forest-850 border border-emerald-500/40 rounded p-3.5 text-center text-xs text-emerald-400 font-mono">
+                      ✓ Claim Settled on Ethereum! Funds Escrowed to Hospital Treasury.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </div>
 
-          {/* Right Column: 5-Stage Zero-Knowledge Eligibility Sequence */}
+          {/* Right Column: 7-Stage Zero-Knowledge Eligibility Sequence */}
           <div className="lg:col-span-7 parda-surface p-6 flex flex-col justify-between space-y-6">
             <div>
               <div className="flex items-center justify-between border-b border-sage-500/20 pb-4 mb-4">
@@ -209,34 +237,36 @@ export default function HospitalPortal({
                     <Sparkles className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-base font-serif font-normal text-ivory-200">Circom Constraint Solver</h3>
-                    <div className="text-[11px] font-mono text-sage-muted">02.02 // claim_verifier.circom</div>
+                    <h3 className="text-base font-serif font-normal text-ivory-200">Circom 2.1 Constraint Solver</h3>
+                    <div className="text-[11px] font-mono text-sage-muted">02.02 // claim_eligibility.circom</div>
                   </div>
                 </div>
-                <span className="text-[10px] font-mono px-2.5 py-1 rounded bg-forest-900 border border-sage-500/30 text-sage-300">
-                  5 POLYNOMIAL CONSTRAINTS
+                <span className="text-[10px] font-mono px-2.5 py-1 rounded bg-forest-900 border border-brass-500/30 text-brass-400 font-bold">
+                  7 POLYNOMIAL CONSTRAINTS
                 </span>
               </div>
 
-              {/* Stepper Display */}
-              <div className="space-y-2.5 mt-4 font-mono text-xs">
+              {/* Stepper Display with all 7 constraints */}
+              <div className="space-y-2 font-mono text-xs">
                 {[
-                  { step: 1, title: '1. Licensed Hospital Merkle Membership', desc: 'Validates hospital ID in approved licensed root using Poseidon hashing.' },
-                  { step: 2, title: '2. Active Policy Expiry Constraint', desc: 'Proves currentTimestamp <= policyExpiryTimestamp (2030) without leaking dates.' },
-                  { step: 3, title: '3. Coverage Cap Validation', desc: `Proves claimAmount (${claimAmount} ETH) <= maxPolicyCoverage (5.0 ETH).` },
-                  { step: 4, title: '4. Anti-Replay Nullifier Generation', desc: 'Derives unique claimNullifier = Poseidon(policySecret, claimId).' },
-                  { step: 5, title: '5. Smart Contract Nullifier Attestation', desc: 'Asserts nullifier unspent on-chain to block duplicate claim fraud.' }
+                  { step: 1, title: '1. Hospital In-Circuit EdDSA Signature', desc: 'Verifies hospital Baby Jubjub key signed the claim message inside the circuit.' },
+                  { step: 2, title: '2. Approved Hospital Merkle Membership', desc: 'Proves hospital public key leaf is in the regulator approved root (depth 8).' },
+                  { step: 3, title: '3. Policy Commitment Verification', desc: 'Proves policyCommitment == Poseidon(patientIdHash, coveredSetRoot, limit, expiry, salt).' },
+                  { step: 4, title: '4. Procedure in Covered Set Merkle Tree', desc: `Proves procedure CPT ${MOCK_FHIR_RECORD.procedure.code} is a leaf in the policy’s private covered set (depth 6).` },
+                  { step: 5, title: '5. 64-Bit Range & Coverage Checks', desc: `Proves claimAmount (${claimAmount} ETH) <= limit AND claimDay < policyExpiryDay.` },
+                  { step: 6, title: '6. Anti-Replay Nullifier Derivation', desc: 'Derives nullifier = Poseidon(policySalt, recordId) to block double claims.' },
+                  { step: 7, title: '7. Payout Recipient Address Binding', desc: 'Constrains recipient address to proof to prevent front-running redirection.' }
                 ].map((item) => {
                   const isDone = proverStep >= item.step || proofGenerated;
                   const isCurrent = proverStep === item.step && !proofGenerated;
                   return (
                     <div
                       key={item.step}
-                      className={`p-3 rounded border transition-all ${
+                      className={`p-2.5 rounded border transition-all ${
                         isDone
                           ? 'bg-forest-850 border-sage-500/30'
                           : isCurrent
-                          ? 'bg-forest-800 border-brass-500'
+                          ? 'bg-forest-800 border-brass-500 shadow-sm'
                           : 'bg-forest-900/60 border-sage-500/10 opacity-60'
                       }`}
                     >
@@ -245,56 +275,30 @@ export default function HospitalPortal({
                           {item.title}
                         </span>
                         {isDone ? (
-                          <span className="text-[10px] font-bold text-brass-400 bg-forest-900 px-2 py-0.5 rounded border border-brass-500/30">✓ PASSED</span>
+                          <span className="text-[10px] font-bold text-brass-400 bg-forest-900 px-2 py-0.5 rounded border border-brass-500/30">✓ SATISFIED</span>
                         ) : (
-                          <span className="text-[10px] text-sage-600">Not yet checked</span>
+                          <span className="text-[10px] text-sage-600">Pending</span>
                         )}
                       </div>
-                      <p className="text-[11px] text-sage-muted mt-1 font-sans">{item.desc}</p>
+                      <p className="text-[11px] text-sage-muted mt-0.5 leading-snug">{item.desc}</p>
                     </div>
                   );
                 })}
               </div>
-
-              {/* Public Signals Preview */}
-              {proofGenerated && (
-                <div className="mt-4 bg-forest-900 border border-sage-500/20 rounded p-3.5 font-mono text-[11px] text-sage-muted space-y-1.5">
-                  <div className="text-brass-400 font-bold mb-1">Public Signals Transmitted Across Boundary to Blockchain:</div>
-                  <div>• Claim Amount: {claimAmount} ETH</div>
-                  <div>• Nullifier Hash: {nullifier?.slice(0, 24)}... (Unique Anti-Replay)</div>
-                  <div>• Merkle Root: 0x162786...897185</div>
-                  <div className="text-ivory-200 font-bold">• Diagnosis ICD-10: [100% REDACTED IN ZERO KNOWLEDGE]</div>
-                </div>
-              )}
             </div>
 
-            {/* Step 2 Button: Submit Claim On-Chain */}
-            <div className="pt-4 border-t border-sage-500/20">
-              {!claimSettled ? (
-                <button
-                  onClick={handleSubmitClaim}
-                  disabled={!proofGenerated || isSubmitting}
-                  className={`w-full flex items-center justify-center space-x-2 font-mono text-xs font-semibold py-3 rounded transition-all ${
-                    proofGenerated
-                      ? 'btn-brass cursor-pointer'
-                      : 'bg-forest-900 text-sage-600 cursor-not-allowed border border-sage-500/20'
-                  }`}
-                >
-                  <Send className="w-4 h-4 text-brass-400" />
-                  <span>{isSubmitting ? "Broadcasting to Sepolia Smart Contract..." : "Submit Claim to Smart Contract & Settle Payout"}</span>
-                </button>
-              ) : (
-                <div className="bg-forest-850 border border-brass-500/40 rounded p-4 text-center space-y-1 font-mono">
-                  <div className="flex items-center justify-center space-x-2 text-ivory-200 font-bold text-sm">
-                    <CheckCircle2 className="w-5 h-5 text-brass-400" />
-                    <span>Claim Settled & Liquidity Transferred!</span>
-                  </div>
-                  <p className="text-xs text-sage-muted">
-                    Hospital Treasury credited with +{claimAmount} ETH. Nullifier marked spent on-chain.
-                  </p>
+            {/* Proof Artifact Preview */}
+            {proofGenerated && (
+              <div className="bg-forest-850 border border-sage-500/20 rounded p-4 space-y-2 text-xs font-mono">
+                <div className="text-[11px] text-sage-muted uppercase tracking-wider">Public Signals Ready for ClaimManager.sol:</div>
+                <div className="grid grid-cols-2 gap-2 text-[11px] text-ivory-200">
+                  <div>Nullifier: <span className="text-brass-400">{nullifier?.slice(0, 10)}...</span></div>
+                  <div>Hospital Root: <span className="text-sage-300">0x2b81...0482</span></div>
+                  <div>Policy Commitment: <span className="text-sage-300">0x498a...92e1</span></div>
+                  <div>Recipient: <span className="text-sage-300">0x7099...79C8</span></div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       )}

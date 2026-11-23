@@ -1,0 +1,8 @@
+{
+  "recordId": "1001",
+  "patientIdHash": "184620194829104810293810293847291048291048201948291048",
+  "procedureCode": 99213,
+  "claimAmount": 15000,
+  "claimDay": 20050,
+  "recipient": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+}
