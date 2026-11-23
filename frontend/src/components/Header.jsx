@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, User, Building2, Landmark, CheckCircle2, Copy, RotateCcw } from 'lucide-react';
+import { Shield, User, Building2, Landmark, CheckCircle2, Copy, RotateCcw, Eye, ShieldAlert } from 'lucide-react';
 
 export default function Header({ activeRole, setActiveRole, currentAccount, onReplayIntro }) {
   const [copied, setCopied] = useState(false);
@@ -24,10 +24,13 @@ export default function Header({ activeRole, setActiveRole, currentAccount, onRe
           <span className="text-sm sm:text-base font-medium tracking-tight text-[#F3EFE5]">
             Parda
           </span>
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#12231C] text-[#B99561] border border-[#B99561]/30 hidden sm:inline-block">
+            ZKP Web3
+          </span>
         </div>
 
-        {/* Center: The Single Role Control */}
-        <div className="flex items-center bg-[#12231C] p-0.5 sm:p-1 rounded border border-[#9DAF9D]/20 order-3 sm:order-2 w-full sm:w-auto justify-center" aria-label="Role switcher">
+        {/* Center: The Role & Verification Control */}
+        <div className="flex flex-wrap items-center bg-[#12231C] p-0.5 sm:p-1 rounded border border-[#9DAF9D]/20 order-3 sm:order-2 w-full sm:w-auto justify-center gap-1" aria-label="Role switcher">
           <button
             onClick={() => setActiveRole('patient')}
             className={`flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs transition-colors ${
@@ -37,7 +40,7 @@ export default function Header({ activeRole, setActiveRole, currentAccount, onRe
             }`}
           >
             <User className="w-3 h-3 text-[#B99561]" />
-            <span>Patient</span>
+            <span>1. Patient</span>
           </button>
 
           <button
@@ -49,7 +52,7 @@ export default function Header({ activeRole, setActiveRole, currentAccount, onRe
             }`}
           >
             <Building2 className="w-3 h-3 text-[#B99561]" />
-            <span>Hospital</span>
+            <span>2. Hospital</span>
           </button>
 
           <button
@@ -61,7 +64,33 @@ export default function Header({ activeRole, setActiveRole, currentAccount, onRe
             }`}
           >
             <Landmark className="w-3 h-3 text-[#B99561]" />
-            <span>Insurer</span>
+            <span>3. Insurer</span>
+          </button>
+
+          <div className="h-4 w-px bg-[#9DAF9D]/20 mx-0.5 hidden md:block" />
+
+          <button
+            onClick={() => setActiveRole('xray')}
+            className={`flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs transition-colors ${
+              activeRole === 'xray'
+                ? 'bg-purple-950/60 text-purple-200 font-medium border border-purple-500/40 shadow-sm'
+                : 'text-purple-400 hover:text-purple-200'
+            }`}
+          >
+            <Eye className="w-3 h-3 text-purple-400" />
+            <span>Privacy X-Ray</span>
+          </button>
+
+          <button
+            onClick={() => setActiveRole('redteam')}
+            className={`flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs transition-colors ${
+              activeRole === 'redteam'
+                ? 'bg-rose-950/60 text-rose-200 font-medium border border-rose-500/40 shadow-sm'
+                : 'text-rose-400 hover:text-rose-200'
+            }`}
+          >
+            <ShieldAlert className="w-3 h-3 text-rose-400" />
+            <span>Red-Team</span>
           </button>
         </div>
 
