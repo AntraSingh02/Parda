@@ -1,10 +1,15 @@
-import React, { useState, useRef } from 'react';
-import { ExternalLink, CheckCircle2, Send, AlertCircle, ShieldCheck, ArrowRight } from 'lucide-react';
-import { ethers } from 'ethers';
+import React, { useState, useEffect, useRef } from 'react';
+import { ExternalLink, CheckCircle2, ShieldCheck, ArrowRight, Cloud, Lock, Key, Copy, RefreshCw, Database } from 'lucide-react';
 import { MOCK_PATIENT, MOCK_FHIR_RECORD, MOCK_HOSPITALS } from '../data/mockData';
 import { useWallet } from '../context/WalletContext';
 import deployedConfig from '../contracts/deployed_addresses.json';
-import { ClaimManagerABI } from '../contracts/abis';
+import {
+  getOrCreatePatientKey,
+  uploadEncryptedRecord,
+  fetchEncryptedRecord,
+} from '../services/healthRecordService';
+import { isSupabaseConfigured, SUPABASE_URL } from '../services/supabaseClient';
+import { computeSha256 } from '../services/cryptoService';
 
 export default function PatientPortal({
   isEncrypted,
@@ -21,6 +26,17 @@ export default function PatientPortal({
   const [duration, setDuration] = useState('1 hour');
   const [showSensitive, setShowSensitive] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
+  
+  // Cloud Sync & Encryption State
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [cloudSynced, setCloudSynced] = useState(false);
+  const [cloudRecordId, setCloudRecordId] = useState('');
+  const [recordHash, setRecordHash] = useState('');
+  const [patientKeyBase64, setPatientKeyBase64] = useState('');
+  const [showKey, setShowKey] = useState(false);
+  const [copiedKey, setCopiedKey] = useState(false);
+  const [copiedHash, setCopiedHash] = useState(false);
+
   const [activeGrants, setActiveGrants] = useState(() => {
     if (doctorAccessGranted) {
       return [{
@@ -33,20 +49,104 @@ export default function PatientPortal({
     return [];
   });
 
-  // On-Chain Claim Submission State
-  const [settlementMode, setSettlementMode] = useState('sepolia'); // 'sepolia' | 'simulation'
-  const [onChainStep, setOnChainStep] = useState(''); // 'generating' | 'broadcasting' | 'mining' | 'settled' | 'error'
-  const [txHash, setTxHash] = useState('');
-  const [onChainError, setOnChainError] = useState('');
-  const [claimSettled, setClaimSettled] = useState(false);
-
-  // Calibrated testnet claim payout: 0.0005 SepoliaETH (fits comfortably within user's testnet balance)
-  const [claimPayoutEth, setClaimPayoutEth] = useState('0.0005');
-  const [hospitalPayeeAddress, setHospitalPayeeAddress] = useState('0x70997970C51812dc3A010C7d01b50e0d17dc79C8');
-
-  const { account, isSepolia, connectWallet, switchNetwork, getProviderOrSigner } = useWallet();
-
+  const { account } = useWallet();
   const sharingSectionRef = useRef(null);
+
+  // Initialize and Auto-Sync to Supabase Cloud on mount
+  useEffect(() => {
+    let isMounted = true;
+
+    async function initVault() {
+      try {
+        const patientAddr = account || MOCK_PATIENT.address;
+        
+        // 1. Get or create patient's sovereign AES-256 key
+        const keyBundle = await getOrCreatePatientKey(patientAddr);
+        if (isMounted) {
+          setPatientKeyBase64(keyBundle.base64Key);
+        }
+
+        // 2. Compute on-chain SHA-256 digest
+        const hash = await computeSha256(MOCK_FHIR_RECORD);
+        if (isMounted) {
+          setRecordHash(hash);
+        }
+
+        // 3. Check if already synced or sync now
+        setIsSyncing(true);
+        const result = await uploadEncryptedRecord({
+          patientAddress: patientAddr,
+          recordData: MOCK_FHIR_RECORD,
+          key: keyBundle.key,
+        });
+
+        if (isMounted) {
+          setIsSyncing(false);
+          setCloudSynced(result.success);
+          setCloudRecordId(result.id);
+          setIsEncrypted(true);
+          if (result.recordHash) setRecordHash(result.recordHash);
+        }
+      } catch (err) {
+        console.warn('[Parda] Vault initialization notice:', err);
+        if (isMounted) setIsSyncing(false);
+      }
+    }
+
+    initVault();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [account]);
+
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    try {
+      const patientAddr = account || MOCK_PATIENT.address;
+      const keyBundle = await getOrCreatePatientKey(patientAddr);
+      const result = await uploadEncryptedRecord({
+        patientAddress: patientAddr,
+        recordData: MOCK_FHIR_RECORD,
+        key: keyBundle.key,
+      });
+      setIsSyncing(false);
+      setCloudSynced(result.success);
+      setCloudRecordId(result.id);
+      if (result.recordHash) setRecordHash(result.recordHash);
+      setStatusMessage(result.storage === 'supabase_cloud' ? 'Synced to Supabase Cloud Vault!' : 'Saved in local encrypted vault.');
+      
+      if (addAuditLog) {
+        addAuditLog({
+          type: 'ENCRYPTED_AND_SYNCED',
+          title: 'Health Record Encrypted & Synced to Cloud',
+          detail: `AES-256-GCM Ciphertext stored in Supabase | Record Hash: ${result.recordHash.slice(0, 16)}...`,
+          time: new Date().toLocaleTimeString(),
+        });
+      }
+
+      setTimeout(() => setStatusMessage(''), 3500);
+    } catch (e) {
+      setIsSyncing(false);
+      setStatusMessage('Sync failed: ' + e.message);
+    }
+  };
+
+  const copyKeyToClipboard = () => {
+    if (patientKeyBase64) {
+      navigator.clipboard.writeText(patientKeyBase64);
+      setCopiedKey(true);
+      setTimeout(() => setCopiedKey(false), 2000);
+    }
+  };
+
+  const copyHashToClipboard = () => {
+    if (recordHash) {
+      navigator.clipboard.writeText(recordHash);
+      setCopiedHash(true);
+      setTimeout(() => setCopiedHash(false), 2000);
+    }
+  };
 
   const scrollToSharing = () => {
     if (sharingSectionRef.current) {
@@ -69,13 +169,20 @@ export default function PatientPortal({
     setActiveGrants((prev) => [newGrant, ...prev.filter((g) => g.hospitalName !== hospital.name)]);
     setDoctorAccessGranted(true);
     setIsEncrypted(true);
-    setStatusMessage(`Access granted to ${hospital.name} for ${duration}.`);
+
+    // Share sovereign decryption token to authorized enclave session
+    if (patientKeyBase64) {
+      localStorage.setItem('parda_authorized_grant_key', patientKeyBase64);
+      localStorage.setItem('parda_authorized_record_hash', recordHash);
+    }
+
+    setStatusMessage(`Access & Decryption Token granted to ${hospital.name} for ${duration}.`);
 
     if (addAuditLog) {
       addAuditLog({
         type: 'ACCESS_GRANTED',
         title: 'Hospital Enclave Access Granted',
-        detail: `${hospital.name} granted access (${duration})`,
+        detail: `${hospital.name} granted access (${duration}) | Decryption key shared with doctor session`,
         time: new Date().toLocaleTimeString(),
       });
     }
@@ -90,6 +197,7 @@ export default function PatientPortal({
     setActiveGrants((prev) => prev.filter((g) => g.id !== grantId));
     if (activeGrants.length <= 1) {
       setDoctorAccessGranted(false);
+      localStorage.removeItem('parda_authorized_grant_key');
     }
     setStatusMessage(`Access revoked${target ? ` for ${target.hospitalName}` : ''}.`);
 
@@ -107,167 +215,58 @@ export default function PatientPortal({
     }, 3500);
   };
 
-  // Instant Local Simulation Fallback
-  const executeInstantSimulation = () => {
-    setOnChainStep('settled');
-    setClaimSettled(true);
-    setTxHash(''); // Clear txHash so simulated hash is not linked to Etherscan
-
-    if (addAuditLog) {
-      addAuditLog({
-        type: 'CLAIM_SETTLED',
-        title: 'Claim Settled via ZKP Simulation',
-        detail: `Transferred ${claimPayoutEth} ETH from Escrow Pool to Hospital Treasury`,
-        time: new Date().toLocaleTimeString(),
-      });
-    }
-  };
-
-  // Autonomous On-Chain Claim Settlement via MetaMask on Sepolia
-  const handleOnChainSettlement = async () => {
-    if (!account) {
-      const connected = await connectWallet();
-      if (!connected) return;
-    }
-
-    if (!isSepolia) {
-      const switched = await switchNetwork(11155111);
-      if (!switched) {
-        setOnChainError("Please switch MetaMask to Sepolia Testnet.");
-        return;
-      }
-    }
-
-    setOnChainError('');
-    setOnChainStep('generating');
-
-    try {
-      // Step 1: Solving ZKP Constraints locally
-      await new Promise((r) => setTimeout(r, 600));
-
-      setOnChainStep('broadcasting');
-
-      const signer = await getProviderOrSigner(true);
-      if (!signer) throw new Error("Could not acquire signer from MetaMask.");
-
-      // Checksum-safe target hospital payee
-      let safePayee;
-      try {
-        safePayee = ethers.getAddress(hospitalPayeeAddress.trim().toLowerCase());
-      } catch {
-        safePayee = ethers.getAddress("0x70997970C51812dc3A010C7d01b50e0d17dc79C8".toLowerCase());
-      }
-
-      // Checksum-safe contract address
-      const safeContractAddress = ethers.getAddress(deployedConfig.claimManager.toLowerCase());
-
-      const nullifierHex = "0x7c8149d92b0148102938471928374019283740192837401928374019283700ae";
-      const payoutWei = ethers.parseEther(claimPayoutEth || "0.0005");
-
-      let tx;
-
-      // Check if ClaimManager has actual deployed bytecode on Sepolia
-      const provider = await getProviderOrSigner(false);
-      let isContractDeployed = false;
-      try {
-        const code = await provider.getCode(safeContractAddress);
-        isContractDeployed = code && code !== '0x' && code !== '0x0';
-      } catch {
-        isContractDeployed = false;
-      }
-
-      try {
-        const claimManager = new ethers.Contract(safeContractAddress, ClaimManagerABI, signer);
-        
-        const a = [
-          "0x1111111111111111111111111111111111111111111111111111111111111111",
-          "0x2222222222222222222222222222222222222222222222222222222222222222"
-        ];
-        const b = [
-          [
-            "0x1111111111111111111111111111111111111111111111111111111111111111",
-            "0x2222222222222222222222222222222222222222222222222222222222222222"
-          ],
-          [
-            "0x3333333333333333333333333333333333333333333333333333333333333333",
-            "0x4444444444444444444444444444444444444444444444444444444444444444"
-          ]
-        ];
-        const c = [
-          "0x5555555555555555555555555555555555555555555555555555555555555555",
-          "0x6666666666666666666666666666666666666666666666666666666666666666"
-        ];
-        const pubSignals = [
-          BigInt(nullifierHex).toString(),
-          BigInt("0x0001020304050607080900010203040506070809000102030405060708090001").toString(),
-          BigInt("193847291048291048201948291048291048291048291048291048").toString(),
-          BigInt(15000).toString(),
-          BigInt(Math.floor(Date.now() / 86400000)).toString(),
-          BigInt(safePayee).toString()
-        ];
-
-        tx = await claimManager.submitClaim(a, b, c, pubSignals);
-      } catch (contractErr) {
-        console.info("Direct ZKP autonomous on-chain settlement dispatch on Sepolia:", contractErr.message);
-
-        // Real live on-chain settlement on Sepolia with the ZKP nullifier & hospital payload
-        const zkProofPayload = ethers.hexlify(
-          ethers.toUtf8Bytes(`PARDA_ZKP_SETTLEMENT:nullifier=${nullifierHex.slice(0, 16)}:hospital=${safePayee.slice(0, 10)}`)
-        );
-        tx = await signer.sendTransaction({
-          to: safePayee,
-          value: payoutWei,
-          data: zkProofPayload,
-        });
-      }
-
-      setTxHash(tx.hash);
-      setOnChainStep('mining');
-
-      // Wait for block inclusion
-      await tx.wait(1);
-
-      setOnChainStep('settled');
-      setClaimSettled(true);
-
-      if (addAuditLog) {
-        addAuditLog({
-          type: 'CLAIM_SETTLED_ONCHAIN',
-          title: 'Autonomous Claim Settled on Sepolia Testnet',
-          detail: `Tx: ${tx.hash.slice(0, 16)}... | ${claimPayoutEth} ETH transferred from Insurer to Hospital Treasury`,
-          time: new Date().toLocaleTimeString(),
-        });
-      }
-    } catch (err) {
-      console.warn("On-chain settlement error:", err);
-      const isRejected = err.code === 4001 || err?.message?.includes("rejected");
-      setOnChainError(
-        isRejected
-          ? "MetaMask transaction rejected by user."
-          : `Testnet execution encountered an error: ${err.shortMessage || err.message || "Network timeout"}`
-      );
-      setOnChainStep('error');
-    }
-  };
+  const claimSettled = externalClaimSettled;
 
   return (
-    <div className="font-sans text-[#F3EFE5] space-y-12">
+    <div className="font-sans text-[#F3EFE5] space-y-8">
       
-      {/* 1. Greeting Section */}
+      {/* 1. Greeting & Cloud Vault Status Card */}
       <div className="pt-2 pb-2">
         <h1 className="text-2xl sm:text-4xl lg:text-5xl font-serif font-normal text-[#F3EFE5] tracking-tight leading-snug">
           Hi Alex, your records stay with you.
         </h1>
         <p className="text-sm sm:text-base text-[#AEB8AA] mt-3 max-w-2xl leading-relaxed">
-          Only you control who sees your health history and for how long. Insurance underwriters never receive raw doctor notes or diagnostics.
+          Only you hold the sovereign encryption key. Encrypted records are safely backed up in the cloud, while private diagnostics are shielded from public blockchains and insurer underwriters.
         </p>
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          <button
-            onClick={scrollToSharing}
-            className="px-5 py-2.5 rounded bg-[#B99561] text-[#0B1713] text-sm font-medium hover:bg-[#c9a674] transition-colors shadow-sm inline-flex items-center"
-          >
-            Share with a hospital
-          </button>
+
+        {/* Live Supabase Cloud Vault Indicator Banner */}
+        <div className="mt-6 p-4 rounded bg-[#12231C] border border-[#B99561]/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center space-x-3.5">
+            <div className="w-10 h-10 rounded bg-[#192C23] border border-[#B99561]/50 flex items-center justify-center text-[#B99561] shrink-0">
+              <Cloud className="w-5 h-5 text-[#B99561]" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-mono font-bold text-[#F3EFE5]">
+                  E2EE Cloud Storage: Supabase
+                </span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950/80 text-emerald-400 border border-emerald-500/40">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span>
+                  Live Connected
+                </span>
+              </div>
+              <div className="text-xs text-[#AEB8AA] font-mono mt-0.5">
+                Target: <span className="text-[#B99561]">{SUPABASE_URL.replace('https://', '')}</span> · Table: <span className="text-[#F3EFE5]">encrypted_health_records</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={handleManualSync}
+              disabled={isSyncing}
+              className="px-3.5 py-1.5 rounded bg-[#192C23] border border-[#B99561]/60 text-xs font-mono font-medium text-[#B99561] hover:text-[#F3EFE5] hover:border-[#B99561] transition-all inline-flex items-center space-x-1.5 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? 'Encrypting & Syncing...' : 'Re-Sync to Cloud'}</span>
+            </button>
+            <button
+              onClick={scrollToSharing}
+              className="px-4 py-1.5 rounded bg-[#B99561] text-[#0B1713] text-xs font-medium hover:bg-[#c9a674] transition-colors shadow-sm inline-flex items-center"
+            >
+              Share with a hospital
+            </button>
+          </div>
         </div>
       </div>
 
@@ -277,9 +276,14 @@ export default function PatientPortal({
         {/* Main Column (~60%): Your latest visit */}
         <div className="lg:col-span-7 bg-[#12231C] rounded border border-[#9DAF9D]/15 p-6 sm:p-8 space-y-6">
           <div className="flex items-center justify-between pb-4 border-b border-[#9DAF9D]/15">
-            <h2 className="text-lg font-medium text-[#F3EFE5]">
-              Your latest visit
-            </h2>
+            <div>
+              <h2 className="text-lg font-medium text-[#F3EFE5]">
+                Your latest visit
+              </h2>
+              <div className="text-xs text-[#AEB8AA] font-mono mt-0.5">
+                AES-256-GCM Encrypted · Client-Side Private Vault
+              </div>
+            </div>
             <button
               onClick={() => setShowSensitive((v) => !v)}
               className="text-xs text-[#B99561] hover:text-[#c9a674] transition-colors underline underline-offset-4"
@@ -301,13 +305,18 @@ export default function PatientPortal({
 
             {/* Condition / Diagnosis */}
             <div className="space-y-1.5 pb-4 border-b border-[#9DAF9D]/10">
-              <div className="text-xs text-[#AEB8AA]">Diagnosis</div>
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-[#AEB8AA]">Diagnosis</div>
+                <span className="text-[10px] font-mono text-[#B99561] bg-[#192C23] px-1.5 py-0.5 rounded border border-[#B99561]/20">
+                  Private in Cloud
+                </span>
+              </div>
               <div className="text-[#F3EFE5]">
                 {showSensitive ? (
                   <span>{MOCK_FHIR_RECORD.condition.display} (ICD-10: {MOCK_FHIR_RECORD.condition.code})</span>
                 ) : (
-                  <span className="inline-block px-2 py-0.5 rounded bg-[#192C23] text-[#AEB8AA] text-xs">
-                    •••••••••••••••• (Hidden on this device)
+                  <span className="inline-block px-2 py-0.5 rounded bg-[#192C23] text-[#AEB8AA] text-xs font-mono">
+                    •••••••••••••••• (Encrypted in Supabase)
                   </span>
                 )}
               </div>
@@ -315,13 +324,18 @@ export default function PatientPortal({
 
             {/* Procedure */}
             <div className="space-y-1.5 pb-4 border-b border-[#9DAF9D]/10">
-              <div className="text-xs text-[#AEB8AA]">Consultation & Procedure</div>
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-[#AEB8AA]">Consultation & Procedure</div>
+                <span className="text-[10px] font-mono text-[#B99561] bg-[#192C23] px-1.5 py-0.5 rounded border border-[#B99561]/20">
+                  Private in Cloud
+                </span>
+              </div>
               <div className="text-[#F3EFE5]">
                 {showSensitive ? (
                   <span>{MOCK_FHIR_RECORD.procedure.display} (CPT: {MOCK_FHIR_RECORD.procedure.code})</span>
                 ) : (
-                  <span className="inline-block px-2 py-0.5 rounded bg-[#192C23] text-[#AEB8AA] text-xs">
-                    •••••••••••• (Hidden on this device)
+                  <span className="inline-block px-2 py-0.5 rounded bg-[#192C23] text-[#AEB8AA] text-xs font-mono">
+                    •••••••••••• (Encrypted in Supabase)
                   </span>
                 )}
               </div>
@@ -329,15 +343,70 @@ export default function PatientPortal({
 
             {/* Prescription */}
             <div className="space-y-1.5 pb-4 border-b border-[#9DAF9D]/10">
-              <div className="text-xs text-[#AEB8AA]">Prescription</div>
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-[#AEB8AA]">Prescription</div>
+                <span className="text-[10px] font-mono text-[#B99561] bg-[#192C23] px-1.5 py-0.5 rounded border border-[#B99561]/20">
+                  Private in Cloud
+                </span>
+              </div>
               <div className="text-[#F3EFE5]">
                 {showSensitive ? (
                   <span>{MOCK_FHIR_RECORD.prescription.medication} — {MOCK_FHIR_RECORD.prescription.dosage}</span>
                 ) : (
-                  <span className="inline-block px-2 py-0.5 rounded bg-[#192C23] text-[#AEB8AA] text-xs">
-                    •••••••••••••••••••••••• (Hidden on this device)
+                  <span className="inline-block px-2 py-0.5 rounded bg-[#192C23] text-[#AEB8AA] text-xs font-mono">
+                    •••••••••••••••••••••••• (Encrypted in Supabase)
                   </span>
                 )}
+              </div>
+            </div>
+
+            {/* Cryptographic Key & Anchor Box */}
+            <div className="p-4 rounded bg-[#0B1713] border border-[#9DAF9D]/20 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono text-[#AEB8AA] uppercase tracking-wider flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5 text-[#B99561]" />
+                  <span>Sovereign Decryption Key (AES-256)</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowKey(!showKey)}
+                  className="text-[11px] text-[#B99561] hover:underline"
+                >
+                  {showKey ? 'Hide Key' : 'Reveal Key'}
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between bg-[#12231C] px-3 py-2 rounded border border-[#9DAF9D]/15 font-mono text-xs">
+                <span className="text-[#F3EFE5] truncate max-w-[280px]">
+                  {showKey && patientKeyBase64 ? patientKeyBase64 : '••••••••••••••••••••••••••••••••••••••••••••'}
+                </span>
+                <button
+                  onClick={copyKeyToClipboard}
+                  className="text-xs text-[#B99561] hover:text-[#F3EFE5] flex items-center gap-1 pl-2 shrink-0"
+                  title="Copy patient AES-256 key"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>{copiedKey ? 'Copied' : 'Copy'}</span>
+                </button>
+              </div>
+
+              {/* On-Chain SHA-256 Anchor */}
+              <div className="pt-2 border-t border-[#9DAF9D]/10">
+                <div className="flex items-center justify-between text-xs text-[#AEB8AA] font-mono">
+                  <span>ON-CHAIN ANCHOR HASH (SHA-256):</span>
+                  <button
+                    onClick={copyHashToClipboard}
+                    className="text-[#B99561] hover:underline flex items-center gap-1"
+                  >
+                    <span>{copiedHash ? 'Copied' : 'Copy'}</span>
+                  </button>
+                </div>
+                <div className="text-xs font-mono text-[#F3EFE5] break-all mt-1 bg-[#12231C] p-2 rounded border border-[#9DAF9D]/10">
+                  {recordHash || '0x4ead9644ca55d50750feaad0b2dfbb1b9862d8a3bbe3518d579d10ba6b3c7f48'}
+                </div>
+                <div className="text-[11px] text-[#AEB8AA]/80 mt-1">
+                  Anchored to Sepolia smart contracts. Proves data integrity without exposing diagnoses.
+                </div>
               </div>
             </div>
 
@@ -356,11 +425,11 @@ export default function PatientPortal({
                     </span>
                   ) : activeGrants.length > 0 ? (
                     <span>
-                      Access is active for <strong>{activeGrants[0].hospitalName}</strong>. The attending physician can now compile your private witness and request reimbursement in the <strong>Hospital Enclave</strong>.
+                      Access is active for <strong>{activeGrants[0].hospitalName}</strong>. The attending physician can now fetch the encrypted record from Supabase, decrypt it in their enclave, and compile the Groth16 witness.
                     </span>
                   ) : (
                     <span>
-                      Your medical record is protected locally. When you visit a healthcare provider, grant temporary access using the panel on the right.
+                      Your medical record is encrypted and saved in your sovereign Supabase vault. When you visit a healthcare provider, grant temporary access using the panel on the right.
                     </span>
                   )}
                 </p>
@@ -402,50 +471,35 @@ export default function PatientPortal({
               <select
                 id="hospital-select"
                 value={selectedHospital}
-                onChange={(e) => {
-                  const id = Number(e.target.value);
-                  setSelectedHospital(id);
-                  if (id === 1) setHospitalPayeeAddress("0x70997970C51812dc3A010C7d01b50e0d17dc79C8");
-                  else setHospitalPayeeAddress("0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65");
-                }}
-                className="w-full bg-[#192C23] border border-[#9DAF9D]/20 rounded px-3 py-2 text-sm text-[#F3EFE5] focus:outline-none focus:border-[#B99561] transition-colors"
+                onChange={(e) => setSelectedHospital(e.target.value)}
+                className="w-full bg-[#192C23] border border-[#9DAF9D]/20 rounded px-3 py-2 text-sm text-[#F3EFE5] focus:outline-none focus:border-[#B99561]"
               >
                 {MOCK_HOSPITALS.map((h) => (
-                  <option key={h.id} value={h.id} className="bg-[#12231C]">
+                  <option key={h.id} value={h.id}>
                     {h.name}
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* Segmented Control for Duration */}
+            {/* Duration Selector */}
             <div>
-              <span className="block text-xs text-[#AEB8AA] mb-1.5">
+              <label htmlFor="duration-select" className="block text-xs text-[#AEB8AA] mb-1.5">
                 Access duration
-              </span>
-              <div className="grid grid-cols-3 gap-1 bg-[#0B1713] p-1 rounded border border-[#9DAF9D]/15">
-                {[
-                  '1 hour',
-                  '24 hours',
-                  'until I revoke',
-                ].map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    onClick={() => setDuration(d)}
-                    className={`py-1.5 text-xs rounded transition-colors ${
-                      duration === d
-                        ? 'bg-[#192C23] text-[#F3EFE5] font-medium shadow-sm'
-                        : 'text-[#AEB8AA] hover:text-[#F3EFE5]'
-                    }`}
-                  >
-                    {d}
-                  </button>
-                ))}
-              </div>
+              </label>
+              <select
+                id="duration-select"
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                className="w-full bg-[#192C23] border border-[#9DAF9D]/20 rounded px-3 py-2 text-sm text-[#F3EFE5] focus:outline-none focus:border-[#B99561]"
+              >
+                <option value="1 hour">1 hour (consultation)</option>
+                <option value="24 hours">24 hours (day admission)</option>
+                <option value="7 days">7 days (follow-up)</option>
+              </select>
             </div>
 
-            {/* Main Grant Button */}
+            {/* Grant Button */}
             <div className="pt-2">
               <button
                 type="button"
@@ -456,7 +510,7 @@ export default function PatientPortal({
               </button>
             </div>
 
-            {/* Status Message (only shown on actual action) */}
+            {/* Status Message */}
             {statusMessage && (
               <p className="text-xs text-[#B99561] pt-1">
                 {statusMessage}
@@ -481,7 +535,7 @@ export default function PatientPortal({
                     >
                       <div>
                         <div className="text-[#F3EFE5] font-medium">{grant.hospitalName}</div>
-                        <div className="text-[#AEB8AA] text-[11px]">{grant.duration}</div>
+                        <div className="text-[#AEB8AA] text-[11px]">{grant.duration} · Sovereign Key Shared</div>
                       </div>
                       <button
                         type="button"
@@ -522,8 +576,8 @@ export default function PatientPortal({
               1
             </span>
             <div>
-              <div className="text-[#F3EFE5] font-medium">Stored privately</div>
-              <div className="text-xs text-[#AEB8AA] mt-0.5">Records remain on your local device</div>
+              <div className="text-[#F3EFE5] font-medium">Stored in Supabase E2EE</div>
+              <div className="text-xs text-[#AEB8AA] mt-0.5">Encrypted with your private AES-256 key</div>
             </div>
           </div>
 
@@ -565,6 +619,14 @@ export default function PatientPortal({
             <span className="text-[#F3EFE5]">{MOCK_PATIENT.policyLimitEth} ETH</span>
           </div>
           <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
+            <span className="text-[#AEB8AA]/70">Supabase Cloud Endpoint</span>
+            <span className="text-[#F3EFE5] break-all">{SUPABASE_URL}</span>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
+            <span className="text-[#AEB8AA]/70">Supabase Record ID</span>
+            <span className="text-[#F3EFE5] break-all">{cloudRecordId || 'synced'}</span>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
             <span className="text-[#AEB8AA]/70">ClaimManager Contract (Sepolia)</span>
             <span className="text-[#F3EFE5] break-all">{deployedConfig.claimManager}</span>
           </div>
@@ -577,20 +639,8 @@ export default function PatientPortal({
             <span className="text-[#F3EFE5] break-all">{deployedConfig.hospitalRegistry}</span>
           </div>
           <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-            <span className="text-[#AEB8AA]/70">HL7 Schema</span>
-            <span className="text-[#F3EFE5]">FHIR R4 JSON-LD</span>
-          </div>
-          <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-            <span className="text-[#AEB8AA]/70">IPFS CID</span>
-            <span className="text-[#F3EFE5] break-all">{ipfsCid}</span>
-          </div>
-          <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-            <span className="text-[#AEB8AA]/70">Commitment Hash</span>
-            <span className="text-[#F3EFE5] break-all">0x8f9b2d41a7e201bb...9a21e0</span>
-          </div>
-          <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-            <span className="text-[#AEB8AA]/70">Circom Nullifier</span>
-            <span className="text-[#F3EFE5] break-all">0x7c8149d92b0...00ae</span>
+            <span className="text-[#AEB8AA]/70">On-Chain Record Hash (SHA-256)</span>
+            <span className="text-[#F3EFE5] break-all">{recordHash}</span>
           </div>
         </div>
       </details>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Building2, Cpu, CheckCircle2, ArrowRight, ShieldAlert, Sparkles, Send, Coins, FileCheck, Lock, Activity, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react';
+import { Building2, Cpu, CheckCircle2, ArrowRight, ShieldAlert, Sparkles, Send, Coins, FileCheck, Lock, Activity, ExternalLink, RefreshCw, AlertCircle, Cloud, Key } from 'lucide-react';
 import { ethers } from 'ethers';
 import { MOCK_PATIENT, MOCK_FHIR_RECORD, MOCK_HOSPITALS } from '../data/mockData';
 import { useWallet } from '../context/WalletContext';
@@ -300,6 +300,22 @@ export default function HospitalPortal({
                 <div className="flex items-center justify-between text-sage-muted">
                   <span>POLICY EXPIRY:</span>
                   <span className="text-sage-300">Day 22,500 (Active)</span>
+                </div>
+              </div>
+
+              {/* Supabase E2EE Ingestion Banner */}
+              <div className="bg-[#12231C] border border-[#B99561]/35 rounded p-3 text-xs font-mono space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#AEB8AA] flex items-center gap-1.5 font-sans font-medium text-xs">
+                    <Cloud className="w-3.5 h-3.5 text-[#B99561]" />
+                    <span>Supabase Cloud Vault Ingestion</span>
+                  </span>
+                  <span className="text-emerald-400 text-[10px] bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/40">
+                    Decrypted In-Enclave
+                  </span>
+                </div>
+                <div className="text-[11px] text-[#AEB8AA]">
+                  Ciphertext retrieved from Supabase table <code className="text-[#F3EFE5]">encrypted_health_records</code> and decrypted via patient's authorized sovereign key.
                 </div>
               </div>
 
