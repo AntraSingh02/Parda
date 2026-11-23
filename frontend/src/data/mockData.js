@@ -62,42 +62,23 @@ export const MOCK_HOSPITALS = [
   },
 ];
 
-export const MOCK_NULLIFIER = "0x2dc35a81e9f4b0028c7921a4f910482910482019482710482019f3";
-
 export const MOCK_ACCOUNTS = {
   patient: {
-    name: "Alex Doe",
-    roleLabel: "Patient",
+    name: "Alex Doe (Patient)",
     role: "patient",
     address: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
     balance: "2.45 ETH",
   },
   hospital: {
-    name: "St. Jude Medical",
-    roleLabel: "Hospital",
+    name: "St. Jude Medical (Hospital)",
     role: "hospital",
     address: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
     balance: "14.20 ETH",
   },
   insurer: {
-    name: "HealthShield Mutual",
-    roleLabel: "Insurer",
+    name: "HealthShield Mutual (Insurer)",
     role: "insurer",
     address: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
     balance: "100.0 ETH",
-  },
-  xray: {
-    name: "Privacy X-Ray",
-    roleLabel: "Inspector",
-    role: "xray",
-    address: "0x000000000000000000000000000000000000XRAY",
-    balance: "Read-Only View",
-  },
-  redteam: {
-    name: "Red-Team Audit",
-    roleLabel: "Security",
-    role: "redteam",
-    address: "0x000000000000000000000000000000000000ATCK",
-    balance: "Adversarial Suite",
   },
 };

@@ -2,13 +2,7 @@ import React from 'react';
 import { Eye, Shield, Lock, CheckCircle2, FileText, Database } from 'lucide-react';
 import { MOCK_FHIR_RECORD } from '../data/mockData';
 
-export default function PrivacyXRay({ claimSettled, settledClaims = [], latestClaim, isBreakGlassActive }) {
-  const currentClaim = latestClaim || settledClaims[0];
-  const claimEth = currentClaim ? currentClaim.amountEth : 1.5;
-  const claimInr = Math.round(claimEth * 10000);
-  const nullifier = currentClaim ? currentClaim.nullifier : '0x2dc35a81e9f4b0028c794029482019482019482019f3';
-  const payee = currentClaim ? currentClaim.payee : '0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
-
+export default function PrivacyXRay({ claimSettled }) {
   return (
     <div className="space-y-8 font-sans text-[#F3EFE5]">
       {/* Header Banner */}
@@ -70,15 +64,8 @@ export default function PrivacyXRay({ claimSettled, settledClaims = [], latestCl
             </div>
 
             <div className="p-3 rounded-xl bg-[#0B1713] border border-[#9DAF9D]/10">
-              <span className="text-[#AEB8AA]/70 block mb-1">Access Protocol:</span>
-              <span className="text-emerald-400 font-semibold text-[11px]">
-                {isBreakGlassActive ? 'EMERGENCY TRAUMA OVERRIDE (AccessLog.sol)' : 'STANDARD PATIENT-WRAPPED KEY (DEK)'}
-              </span>
-            </div>
-
-            <div className="p-3 rounded-xl bg-[#0B1713] border border-[#9DAF9D]/10">
               <span className="text-[#AEB8AA]/70 block mb-1">Claim Reimbursement:</span>
-              <span className="text-[#B99561] font-bold">₹{claimInr.toLocaleString('en-IN')} ({claimEth.toFixed(2)} ETH testnet equivalent)</span>
+              <span className="text-[#B99561] font-bold">₹15,000 (1.5 ETH testnet equivalent)</span>
             </div>
           </div>
         </div>
@@ -156,7 +143,7 @@ export default function PrivacyXRay({ claimSettled, settledClaims = [], latestCl
           <div className="space-y-3 font-mono text-xs">
             <div className="p-3 rounded-xl bg-[#0B1713] border border-[#9DAF9D]/10">
               <span className="text-[#AEB8AA]/70 block mb-1">pubSignals[0] (Nullifier):</span>
-              <span className="text-purple-300 truncate block">{nullifier.slice(0, 20)}... (Poseidon)</span>
+              <span className="text-purple-300 truncate block">0x7f4e9102837401928374...</span>
             </div>
 
             <div className="p-3 rounded-xl bg-[#0B1713] border border-[#9DAF9D]/10">
@@ -171,12 +158,12 @@ export default function PrivacyXRay({ claimSettled, settledClaims = [], latestCl
 
             <div className="p-3 rounded-xl bg-[#0B1713] border border-[#9DAF9D]/10">
               <span className="text-[#AEB8AA]/70 block mb-1">pubSignals[3] (Claim Amount):</span>
-              <span className="text-emerald-400 font-bold">₹{claimInr.toLocaleString('en-IN')} ({claimEth.toFixed(2)} ETH)</span>
+              <span className="text-emerald-400 font-bold">15,000 INR (uint64)</span>
             </div>
 
             <div className="p-3 rounded-xl bg-[#0B1713] border border-[#9DAF9D]/10">
               <span className="text-[#AEB8AA]/70 block mb-1">pubSignals[5] (Recipient):</span>
-              <span className="text-[#F3EFE5] truncate block">{payee.slice(0, 22)}...</span>
+              <span className="text-[#F3EFE5] truncate block">0x70997970C51812dc3A010C7d...</span>
             </div>
           </div>
         </div>
